@@ -20,7 +20,7 @@ O projeto está em **estágio inicial de scaffold**:
 
 - `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
 - `src/main.rs` contém apenas um `Hello, world!` básico.
-- Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5433 do host).
+- Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
 - Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql` e `002_insert_game.sql`).
 - Nenhuma dependência externa declarada no `Cargo.toml` ainda (o SQLx ainda não está integrado ao código).
 
