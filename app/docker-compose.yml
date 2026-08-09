@@ -1,12 +1,3 @@
-# Docker Compose — FF Codex
-# Sobe o PostgreSQL usado pela API Rust (Axum + SQLx).
-#
-# Nota: a porta 5432 do host está ocupada por um PostgreSQL nativo,
-# por isso o container é exposto na porta 5433 (interna permanece 5432).
-#
-# Banco é EFÊMERO: sem volume persistente, dados são perdidos ao
-# recriar o container (docker compose down && up).
-
 services:
   postgres:
     image: postgres:18.4-alpine
