@@ -112,6 +112,7 @@ ff-codex/
 │   ├── migrations/        # Migrações SQLx
 │   │   ├── 001_create_table_game.sql
 │   │   └── 002_insert_game.sql
+|   |   |__ 003_create_table_caracters.sql
 │   └── src/
 │       └── main.rs        # Ponto de entrada da aplicação
 └── .gitignore             # Arquivos ignorados pelo Git
