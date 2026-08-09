@@ -1,0 +1,37 @@
+# Docker Compose — FF Codex
+# Sobe o PostgreSQL usado pela API Rust (Axum + SQLx).
+#
+# Nota: a porta 5432 do host está ocupada por um PostgreSQL nativo,
+# por isso o container é exposto na porta 5433 (interna permanece 5432).
+#
+# Banco é EFÊMERO: sem volume persistente, dados são perdidos ao
+# recriar o container (docker compose down && up).
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: ff-codex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ff-codex
+      POSTGRES_PASSWORD: ff-codex
+      POSTGRES_DB: ff-codex-db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ff-codex -d ff-codex-db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ff-codex-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+networks:
+  ff-codex-net:
+    driver: bridge

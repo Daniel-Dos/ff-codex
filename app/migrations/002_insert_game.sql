@@ -1,0 +1,16 @@
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy',1987);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy II',1988);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy III',1990);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy IV',1991);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy V',1992);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy VI',1994);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy VII',1997);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy VIII',1999);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy IX',2000);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy X',2001);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XI',2002);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XII',2006);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XIII',2009);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XIV',2010);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XV',2016);
+INSERT INTO games(titulo, ano_lancamento) values ('Final Fantasy XVI',2023);
