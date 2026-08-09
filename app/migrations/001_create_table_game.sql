@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS games (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    titulo varchar(255) NOT NULL,
+    ano_lancamento INTEGER NOT NULL
+);

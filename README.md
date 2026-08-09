@@ -10,9 +10,9 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 |------------|-------|--------|
 | [Rust](https://www.rust-lang.org/) | Linguagem principal | Implementado (scaffold) |
 | [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Planejado — ainda não implementado |
-| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Planejado — ainda não implementado |
+| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (migrações) |
 
-> **Atenção:** Axum e SQLx ainda **não** estão implementados. O projeto está na fase inicial de scaffold e essas dependências serão adicionadas conforme o roadmap de aprendizado avança.
+> **Atenção:** Axum ainda **não** está implementado. O projeto está na fase inicial de scaffold e essa dependência será adicionada conforme o roadmap de aprendizado avança. O banco de dados (PostgreSQL via Docker Compose) e as migrações SQLx já estão configurados.
 
 ## Status
 
@@ -20,9 +20,11 @@ O projeto está em **estágio inicial de scaffold**:
 
 - `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
 - `src/main.rs` contém apenas um `Hello, world!` básico.
-- Nenhuma dependência externa adicionada ainda.
+- Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5433 do host).
+- Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql` e `002_insert_game.sql`).
+- Nenhuma dependência externa declarada no `Cargo.toml` ainda (o SQLx ainda não está integrado ao código).
 
-As próximas etapas adicionam Axum e SQLx de forma incremental, sempre com foco em aprender um conceito por vez.
+As próximas etapas adicionam Axum e integram o SQLx ao código, sempre com foco em aprender um conceito por vez.
 
 ## Roadmap
 
@@ -59,16 +61,38 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 
 - [Rust](https://www.rust-lang.org/tools/install) instalado (toolchain com suporte à `edition 2024`).
 - `cargo` disponível no `PATH`.
+- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/) instalados.
+- `sqlx-cli` instalado para executar as migrações:
+
+  ```bash
+  cargo install sqlx-cli --no-default-features --features native-tls,postgres
+  ```
 
 ### Passos
 
+Todos os comandos abaixo são executados a partir da pasta `app/`:
+
 ```bash
-# Compilar o projeto
+cd app
+
+# 1. Subir o banco de dados (PostgreSQL via Docker Compose)
+docker compose up -d
+
+# 2. Executar as migrações (usa o DATABASE_URL definido no .env)
+sqlx migrate run
+
+# 3. Compilar o projeto
 cargo build
 
-# Executar o binário
+# 4. Executar o binário
 cargo run
 ```
+
+Notas:
+
+- O banco é **efêmero**: o `docker-compose.yml` não define volume persistente, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
+- O `DATABASE_URL` do `.env` aponta para `localhost:5433`, pois a porta 5432 do host está ocupada por um PostgreSQL nativo.
+- Para parar o banco: `docker compose down`.
 
 A saída esperada no estado atual é:
 
@@ -80,11 +104,17 @@ Hello, world!
 
 ```
 ff-codex/
-├── Cargo.toml        # Manifesto do projeto (dependências e configuração)
-├── Cargo.lock        # Versões travadas das dependências
-├── src/
-│   └── main.rs       # Ponto de entrada da aplicação
-└── .gitignore        # Arquivos ignorados pelo Git
+├── app/
+│   ├── Cargo.toml         # Manifesto do projeto (dependências e configuração)
+│   ├── Cargo.lock         # Versões travadas das dependências
+│   ├── docker-compose.yml # PostgreSQL efêmero para desenvolvimento
+│   ├── .env               # Variáveis de ambiente (DATABASE_URL)
+│   ├── migrations/        # Migrações SQLx
+│   │   ├── 001_create_table_game.sql
+│   │   └── 002_insert_game.sql
+│   └── src/
+│       └── main.rs        # Ponto de entrada da aplicação
+└── .gitignore             # Arquivos ignorados pelo Git
 ```
 
-A estrutura será expandida conforme novas dependências e módulos forem adicionados.
+O código-fonte fica em `app/` — todos os comandos (`cargo`, `sqlx`, `docker compose`) devem ser executados a partir dessa pasta. A estrutura será expandida conforme novas dependências e módulos forem adicionados.
