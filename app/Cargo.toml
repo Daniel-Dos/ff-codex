@@ -11,3 +11,12 @@ incremental=false
 opt-level=0
 
 [dependencies]
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+sqlx = { version = "0.8", features = ["sqlite","runtime-tokio","macros"], default-features = false }
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "signal"] }
+anyhow = "1.0.101"
+serde_json = "1.0"
+axum = { version = "0.8.9" }
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "1.0"
