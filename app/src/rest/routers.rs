@@ -1,8 +1,8 @@
 use axum::Router;
 use axum::routing::get;
 
-use crate::rest::handler::{health, ready};
 use crate::rest::handler::games_handler::get_games;
+use crate::rest::handler::{health, ready};
 
 pub fn router() -> Router {
     Router::new()
