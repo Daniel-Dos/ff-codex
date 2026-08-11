@@ -1,3 +1,22 @@
-fn main() {
-    println!("Hello, world!");
+mod rest;
+
+use crate::rest::{router, server};
+
+use tracing::info;
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,ff_codex=trace")),
+        )
+        .json()
+        .init();
+
+    info!("Iniciando a api de Final Fantasy.");
+    let app = router();
+    server(app).await?;
+
+    Ok(())
 }

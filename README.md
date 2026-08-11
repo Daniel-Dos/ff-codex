@@ -9,38 +9,42 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 | Tecnologia | Papel | Status |
 |------------|-------|--------|
 | [Rust](https://www.rust-lang.org/) | Linguagem principal | Implementado (scaffold) |
-| [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Planejado — ainda não implementado |
+| [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Implementado (rotas `/health`, `/ready`, `/ff-codex/games`) |
 | [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (migrações) |
 
-> **Atenção:** Axum ainda **não** está implementado. O projeto está na fase inicial de scaffold e essa dependência será adicionada conforme o roadmap de aprendizado avança. O banco de dados (PostgreSQL via Docker Compose) e as migrações SQLx já estão configurados.
+> **Atenção:** o SQLx ainda **não** está integrado ao código da API. As migrações existem e o banco PostgreSQL sobe via Docker Compose, mas os handlers devolvem dados fixos (hardcoded). A integração com o banco é a próxima etapa do roadmap.
 
 ## Status
 
-O projeto está em **estágio inicial de scaffold**:
+O projeto está em **estágio de API funcional com dados fixos**:
 
 - `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
-- `src/main.rs` contém apenas um `Hello, world!` básico.
+- Servidor HTTP com Axum 0.8 em `src/rest/` — rotas `/health`, `/ready` e `/ff-codex/games`.
+- Logs estruturados em JSON via `tracing`/`tracing-subscriber`.
 - Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
-- Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql` e `002_insert_game.sql`).
-- Nenhuma dependência externa declarada no `Cargo.toml` ainda (o SQLx ainda não está integrado ao código).
+- Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
+- SQLx declarado no `Cargo.toml`, mas ainda **não integrado ao código** — os handlers devolvem dados fixos.
 
-As próximas etapas adicionam Axum e integram o SQLx ao código, sempre com foco em aprender um conceito por vez.
+As próximas etapas integram o SQLx ao código (pool de conexões e consultas reais), sempre com foco em aprender um conceito por vez.
 
 ## Roadmap
 
 Etapas planejadas para o aprendizado, em ordem sugerida:
 
-1. **Servidor HTTP com Axum**
-   - Criar um endpoint `GET /health` que retorna o status da API.
-   - Entender rotas, handlers e extração de parâmetros.
+1. **Servidor HTTP com Axum** ✅
+   - Endpoint `GET /health` que retorna o status da API. ✅
+   - Endpoint `GET /ready` (prontidão do serviço). ✅
+   - Endpoint `GET/POST /ff-codex/games` (lista e cadastro, dados fixos por enquanto). ✅
+   - Entender rotas, handlers e extração de parâmetros. ✅
 
 2. **Modelagem de dados**
-   - Definir entidades do universo *Final Fantasy* (ex.: criaturas, personagens, itens).
-   - Introduzir tipos e estruturas em Rust.
+   - Definir entidades do universo *Final Fantasy* (ex.: criaturas, personagens, itens). 🔄
+   - Introduzir tipos e estruturas em Rust (DTOs `GamesRequest`/`GamesResponse` já criados). 🔄
 
-3. **Persistência com SQLx**
-   - Conectar a um banco de dados (ex.: PostgreSQL ou SQLite).
-   - Executar migrações e consultas básicas.
+3. **Persistência com SQLx** (próxima etapa)
+   - Conectar ao PostgreSQL via Docker Compose (pool de conexões).
+   - Executar migrações e consultas reais no código.
+   - Substituir os dados fixos dos handlers por consultas ao banco.
 
 4. **CRUD da API**
    - Implementar operações de criação, leitura, atualização e exclusão para as entidades.
@@ -91,14 +95,34 @@ cargo run
 Notas:
 
 - O banco é **efêmero**: o `docker-compose.yml` não define volume persistente, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
-- O `DATABASE_URL` do `.env` aponta para `localhost:5433`, pois a porta 5432 do host está ocupada por um PostgreSQL nativo.
+- O `DATABASE_URL` do `.env` aponta para `localhost:5432` (mesma porta mapeada pelo `docker-compose.yml`).
 - Para parar o banco: `docker compose down`.
 
-A saída esperada no estado atual é:
+A saída esperada ao executar `cargo run` é uma sequência de logs estruturados em JSON, por exemplo:
 
+```json
+{"timestamp":"...","level":"INFO","fields":{"message":"Iniciando a api de Final Fantasy."},"target":"ff_codex"}
+{"timestamp":"...","level":"INFO","fields":{"message":"Server starting on http://0.0.0.0:8080"},"target":"ff_codex::rest::server_app"}
 ```
-Hello, world!
+
+Para testar a API com o servidor de pé:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/ready
+curl http://localhost:8080/ff-codex/games
 ```
+
+## Endpoints
+
+| Método | Rota | Descrição | Resposta |
+|--------|------|-----------|----------|
+| GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` |
+| GET | `/ready` | Prontidão do serviço | `200` (sem corpo) |
+| GET | `/ff-codex/games` | Lista de jogos (dados fixos, sem banco) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
+| POST | `/ff-codex/games` | Cadastra um jogo (eco, sem persistência) | `200` corpo ecoado |
+
+> Os dados de `/ff-codex/games` ainda são fixos (hardcoded) — a persistência com SQLx é a próxima etapa.
 
 ## Estrutura do projeto
 
@@ -107,14 +131,25 @@ ff-codex/
 ├── app/
 │   ├── Cargo.toml         # Manifesto do projeto (dependências e configuração)
 │   ├── Cargo.lock         # Versões travadas das dependências
+│   ├── Dockerfile         # Build multi-stage (rust:1.97 → distroless, porta 8080)
 │   ├── docker-compose.yml # PostgreSQL efêmero para desenvolvimento
 │   ├── .env               # Variáveis de ambiente (DATABASE_URL)
 │   ├── migrations/        # Migrações SQLx
 │   │   ├── 001_create_table_game.sql
-│   │   └── 002_insert_game.sql
-|   |   |__ 003_create_table_caracters.sql
+│   │   ├── 002_insert_game.sql
+│   │   └── 003_create_table_caracters.sql
 │   └── src/
-│       └── main.rs        # Ponto de entrada da aplicação
+│       ├── main.rs        # Ponto de entrada (tracing JSON + router + server)
+│       ├── rest.rs        # Módulo raiz da API (re-exports)
+│       └── rest/
+│           ├── dto.rs             # DTOs (GamesRequest, GamesResponse)
+│           ├── dto/game.rs        # Definição dos DTOs de game
+│           ├── error.rs           # AppError + IntoResponse centralizado
+│           ├── handler.rs         # Handlers (health, ready, games)
+│           ├── handler/health.rs  # GET /health e GET /ready
+│           ├── handler/games_handler.rs # GET/POST /ff-codex/games
+│           ├── routers.rs         # Definição das rotas
+│           └── server_app.rs      # Bind + graceful shutdown (Ctrl+C/SIGTERM)
 └── .gitignore             # Arquivos ignorados pelo Git
 ```
 
