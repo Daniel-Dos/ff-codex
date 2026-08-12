@@ -10,24 +10,24 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 |------------|-------|--------|
 | [Rust](https://www.rust-lang.org/) | Linguagem principal | Implementado (scaffold) |
 | [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Implementado (rotas `/health`, `/ready`, `/ff-codex/games`) |
-| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (pool + consulta no startup) |
+| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (GET lê do banco) |
 
-> **Atenção:** o SQLx está **parcialmente integrado**. O `main.rs` cria um pool de conexões (`PgPool`) e consulta a tabela `games` no startup (log `Games: [...]`), mas o pool ainda **não** foi ligado aos handlers do Axum (falta o `State`) — `GET /ff-codex/games` continua devolvendo dados fixos. A próxima etapa é injetar o `GameRepository` nos handlers.
+> **Atenção:** o SQLx está integrado ao fluxo de leitura: `GET /ff-codex/games` consulta a tabela `games` via `State` + `GameService`. O `POST /ff-codex/games` ainda **não** persiste — ele devolve um eco do payload. A próxima etapa é persistir o cadastro (INSERT).
 
 ## Status
 
-O projeto está em **estágio de API funcional com dados fixos e SQLx parcialmente integrado**:
+O projeto está em **estágio de API funcional com leitura no banco (GET) e cadastro sem persistência (POST)**:
 
 - `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
 - Servidor HTTP com Axum 0.8 em `src/rest/` — rotas `/health`, `/ready` e `/ff-codex/games`.
 - Logs estruturados em JSON via `tracing`/`tracing-subscriber`.
 - Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
 - Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
-- SQLx integrado ao `main.rs`: carrega o `.env` via `dotenvy`, cria o `PgPool` (feature `postgres`) e consulta a tabela `games` no startup (log `Games: [...]`).
-- Camadas `domain/` (`Game` com `FromRow`) e `repository/` (`GameRepository::all_games`).
-- **Ainda pendente:** o repositório não está ligado aos handlers — `GET /ff-codex/games` segue com dados fixos.
+- SQLx integrado: `.env` via `dotenvy`, `PgPool` (feature `postgres`) criado no `main.rs`, consulta `games` no startup (log `Games: [...]`) e **`GET /ff-codex/games` lê do banco** via `State` (`GameService` → `GameRepository`).
+- Camadas `domain/` (`Game` com `FromRow`), `repository/` (`GameRepository::all_games`), `service/` (`GameService`) e `rest/app_state.rs` (`AppState`) — o `GameService` retorna domínio e a conversão `Game` → `GamesResponse` acontece no handler (camada de apresentação).
+- **Ainda pendente:** `POST /ff-codex/games` devolve um eco do payload — a persistência (INSERT) é a próxima etapa.
 
-A próxima etapa é injetar o `GameRepository` nos handlers do Axum via `State`, sempre com foco em aprender um conceito por vez.
+As próximas etapas adicionam a escrita (INSERT no POST), sempre com foco em aprender um conceito por vez.
 
 ## Roadmap
 
@@ -36,7 +36,7 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 1. **Servidor HTTP com Axum** ✅
    - Endpoint `GET /health` que retorna o status da API. ✅
    - Endpoint `GET /ready` (prontidão do serviço). ✅
-   - Endpoint `GET/POST /ff-codex/games` (lista e cadastro, dados fixos por enquanto). ✅
+   - Endpoint `GET/POST /ff-codex/games` (lista do banco; cadastro como eco). ✅
    - Entender rotas, handlers e extração de parâmetros. ✅
 
 2. **Modelagem de dados**
@@ -45,8 +45,9 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 
 3. **Persistência com SQLx** 🔄 (em andamento)
    - Conectar ao PostgreSQL via Docker Compose (pool de conexões). ✅
-   - Executar migrações e consultas reais no código (pool + `GameRepository::all_games` no startup). ✅
-   - Substituir os dados fixos dos handlers por consultas ao banco (injetar o `GameRepository` via `State`). 🔄
+   - Executar migrações e consultas reais no código (`GameRepository::all_games` no startup). ✅
+   - Ligar o repositório aos handlers via `State` (`GameService` + `AppState`) — `GET /ff-codex/games` lê do banco. ✅
+   - Persistir o cadastro no `POST /ff-codex/games` (INSERT). 🔄
 
 4. **CRUD da API**
    - Implementar operações de criação, leitura, atualização e exclusão para as entidades.
@@ -123,10 +124,10 @@ curl http://localhost:8080/ff-codex/games
 |--------|------|-----------|----------|
 | GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` |
 | GET | `/ready` | Prontidão do serviço | `200` (sem corpo) |
-| GET | `/ff-codex/games` | Lista de jogos (dados fixos — o handler ainda não usa o banco) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
+| GET | `/ff-codex/games` | Lista de jogos do banco (via `GameService`) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
 | POST | `/ff-codex/games` | Cadastra um jogo (eco, sem persistência) | `200` corpo ecoado |
 
-> `GET /ff-codex/games` ainda devolve dados fixos (hardcoded). O pool já existe e consulta o banco no startup (`Games: [...]`), mas ainda não foi ligado ao handler via `State` — essa é a próxima etapa.
+> `GET /ff-codex/games` lê da tabela `games` (SQLx). O `POST` ainda não persiste — devolve um eco do payload; a persistência (INSERT) é a próxima etapa.
 
 ## Estrutura do projeto
 
@@ -146,18 +147,21 @@ ff-codex/
 │       ├── main.rs        # Ponto de entrada (dotenv + tracing JSON + pool SQLx + router + server)
 │       ├── rest.rs        # Módulo raiz da API (re-exports)
 │       ├── rest/
+│       │   ├── app_state.rs       # AppState (GameService) injetado via State
 │       │   ├── dto.rs             # DTOs (GamesRequest, GamesResponse)
-│       │   ├── dto/game.rs        # Definição dos DTOs de game
+│       │   ├── dto/game.rs        # DTOs + impl From<Game> for GamesResponse
 │       │   ├── error.rs           # AppError + IntoResponse centralizado
 │       │   ├── handler.rs         # Handlers (health, ready, games)
 │       │   ├── handler/health.rs  # GET /health e GET /ready
 │       │   ├── handler/games_handler.rs # GET/POST /ff-codex/games
-│       │   ├── routers.rs         # Definição das rotas
+│       │   ├── routers.rs         # Definição das rotas (+ with_state)
 │       │   └── server_app.rs      # Bind + graceful shutdown (Ctrl+C/SIGTERM)
 │       ├── domain.rs      # Módulo raiz de domínio
-│       ├── domain/game.rs # Struct Game (FromRow, campos privados)
+│       ├── domain/game.rs # Struct Game (FromRow, campos pub)
 │       ├── repository.rs  # Módulo raiz de repositórios
-│       └── repository/game.rs # GameRepository (pool PgPool + all_games)
+│       ├── repository/game.rs # GameRepository (pool PgPool + all_games)
+│       ├── service.rs     # Módulo raiz de serviços
+│       └── service/game_service.rs # GameService (GameError + all_games)
 └── .gitignore             # Arquivos ignorados pelo Git
 ```
 

@@ -1,6 +1,7 @@
 use crate::domain::game::Game;
 use sqlx::PgPool;
 
+#[derive(Clone)]
 pub struct GameRepository {
     pool: PgPool,
 }

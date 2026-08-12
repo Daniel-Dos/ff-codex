@@ -1,17 +1,24 @@
 use crate::rest::AppError;
+use crate::rest::app_state::AppState;
 use crate::rest::dto::game::{GamesRequest, GamesResponse};
 use axum::Json;
+use axum::extract::State;
 use tracing::info;
 
-pub async fn list_games() -> Result<Json<Vec<GamesResponse>>, AppError> {
+pub async fn list_games(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<GamesResponse>>, AppError> {
     info!("Obtendo todos os games!");
 
-    let game = GamesResponse {
-        titulo: String::from("Final Fantasy VII"),
-        ano_lancamento: 1997,
-    };
+    let games = state
+        .game_service
+        .all_games()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao obter os games: {}", e)))?;
 
-    Ok(Json(vec![game]))
+    let game_response: Vec<GamesResponse> = games.into_iter().map(GamesResponse::from).collect();
+
+    Ok(Json(game_response))
 }
 
 pub async fn create_games(payload: Json<GamesRequest>) -> Result<Json<GamesResponse>, AppError> {
