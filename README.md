@@ -10,22 +10,24 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 |------------|-------|--------|
 | [Rust](https://www.rust-lang.org/) | Linguagem principal | Implementado (scaffold) |
 | [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Implementado (rotas `/health`, `/ready`, `/ff-codex/games`) |
-| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (migrações) |
+| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (pool + consulta no startup) |
 
-> **Atenção:** o SQLx ainda **não** está integrado ao código da API. As migrações existem e o banco PostgreSQL sobe via Docker Compose, mas os handlers devolvem dados fixos (hardcoded). A integração com o banco é a próxima etapa do roadmap.
+> **Atenção:** o SQLx está **parcialmente integrado**. O `main.rs` cria um pool de conexões (`PgPool`) e consulta a tabela `games` no startup (log `Games: [...]`), mas o pool ainda **não** foi ligado aos handlers do Axum (falta o `State`) — `GET /ff-codex/games` continua devolvendo dados fixos. A próxima etapa é injetar o `GameRepository` nos handlers.
 
 ## Status
 
-O projeto está em **estágio de API funcional com dados fixos**:
+O projeto está em **estágio de API funcional com dados fixos e SQLx parcialmente integrado**:
 
 - `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
 - Servidor HTTP com Axum 0.8 em `src/rest/` — rotas `/health`, `/ready` e `/ff-codex/games`.
 - Logs estruturados em JSON via `tracing`/`tracing-subscriber`.
 - Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
 - Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
-- SQLx declarado no `Cargo.toml`, mas ainda **não integrado ao código** — os handlers devolvem dados fixos.
+- SQLx integrado ao `main.rs`: carrega o `.env` via `dotenvy`, cria o `PgPool` (feature `postgres`) e consulta a tabela `games` no startup (log `Games: [...]`).
+- Camadas `domain/` (`Game` com `FromRow`) e `repository/` (`GameRepository::all_games`).
+- **Ainda pendente:** o repositório não está ligado aos handlers — `GET /ff-codex/games` segue com dados fixos.
 
-As próximas etapas integram o SQLx ao código (pool de conexões e consultas reais), sempre com foco em aprender um conceito por vez.
+A próxima etapa é injetar o `GameRepository` nos handlers do Axum via `State`, sempre com foco em aprender um conceito por vez.
 
 ## Roadmap
 
@@ -41,10 +43,10 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
    - Definir entidades do universo *Final Fantasy* (ex.: criaturas, personagens, itens). 🔄
    - Introduzir tipos e estruturas em Rust (DTOs `GamesRequest`/`GamesResponse` já criados). 🔄
 
-3. **Persistência com SQLx** (próxima etapa)
-   - Conectar ao PostgreSQL via Docker Compose (pool de conexões).
-   - Executar migrações e consultas reais no código.
-   - Substituir os dados fixos dos handlers por consultas ao banco.
+3. **Persistência com SQLx** 🔄 (em andamento)
+   - Conectar ao PostgreSQL via Docker Compose (pool de conexões). ✅
+   - Executar migrações e consultas reais no código (pool + `GameRepository::all_games` no startup). ✅
+   - Substituir os dados fixos dos handlers por consultas ao banco (injetar o `GameRepository` via `State`). 🔄
 
 4. **CRUD da API**
    - Implementar operações de criação, leitura, atualização e exclusão para as entidades.
@@ -96,12 +98,14 @@ Notas:
 
 - O banco é **efêmero**: o `docker-compose.yml` não define volume persistente, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
 - O `DATABASE_URL` do `.env` aponta para `localhost:5432` (mesma porta mapeada pelo `docker-compose.yml`).
+- **`cargo run` agora exige o banco de pé:** o `main.rs` conecta ao PostgreSQL e consulta a tabela `games` no startup. Se o banco estiver parado ou o `DATABASE_URL` não estiver definido no `.env`, o programa logga o erro e encerra antes de subir o servidor.
 - Para parar o banco: `docker compose down`.
 
 A saída esperada ao executar `cargo run` é uma sequência de logs estruturados em JSON, por exemplo:
 
 ```json
 {"timestamp":"...","level":"INFO","fields":{"message":"Iniciando a api de Final Fantasy."},"target":"ff_codex"}
+{"timestamp":"...","level":"INFO","fields":{"message":"Games: [Game { id: 1, titulo: \"Final Fantasy\", ano_lancamento: 1987 }, Game { id: 2, titulo: \"Final Fantasy II\", ano_lancamento: 1988 }, ...]"},"target":"ff_codex"}
 {"timestamp":"...","level":"INFO","fields":{"message":"Server starting on http://0.0.0.0:8080"},"target":"ff_codex::rest::server_app"}
 ```
 
@@ -119,10 +123,10 @@ curl http://localhost:8080/ff-codex/games
 |--------|------|-----------|----------|
 | GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` |
 | GET | `/ready` | Prontidão do serviço | `200` (sem corpo) |
-| GET | `/ff-codex/games` | Lista de jogos (dados fixos, sem banco) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
+| GET | `/ff-codex/games` | Lista de jogos (dados fixos — o handler ainda não usa o banco) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
 | POST | `/ff-codex/games` | Cadastra um jogo (eco, sem persistência) | `200` corpo ecoado |
 
-> Os dados de `/ff-codex/games` ainda são fixos (hardcoded) — a persistência com SQLx é a próxima etapa.
+> `GET /ff-codex/games` ainda devolve dados fixos (hardcoded). O pool já existe e consulta o banco no startup (`Games: [...]`), mas ainda não foi ligado ao handler via `State` — essa é a próxima etapa.
 
 ## Estrutura do projeto
 
@@ -139,17 +143,21 @@ ff-codex/
 │   │   ├── 002_insert_game.sql
 │   │   └── 003_create_table_caracters.sql
 │   └── src/
-│       ├── main.rs        # Ponto de entrada (tracing JSON + router + server)
+│       ├── main.rs        # Ponto de entrada (dotenv + tracing JSON + pool SQLx + router + server)
 │       ├── rest.rs        # Módulo raiz da API (re-exports)
-│       └── rest/
-│           ├── dto.rs             # DTOs (GamesRequest, GamesResponse)
-│           ├── dto/game.rs        # Definição dos DTOs de game
-│           ├── error.rs           # AppError + IntoResponse centralizado
-│           ├── handler.rs         # Handlers (health, ready, games)
-│           ├── handler/health.rs  # GET /health e GET /ready
-│           ├── handler/games_handler.rs # GET/POST /ff-codex/games
-│           ├── routers.rs         # Definição das rotas
-│           └── server_app.rs      # Bind + graceful shutdown (Ctrl+C/SIGTERM)
+│       ├── rest/
+│       │   ├── dto.rs             # DTOs (GamesRequest, GamesResponse)
+│       │   ├── dto/game.rs        # Definição dos DTOs de game
+│       │   ├── error.rs           # AppError + IntoResponse centralizado
+│       │   ├── handler.rs         # Handlers (health, ready, games)
+│       │   ├── handler/health.rs  # GET /health e GET /ready
+│       │   ├── handler/games_handler.rs # GET/POST /ff-codex/games
+│       │   ├── routers.rs         # Definição das rotas
+│       │   └── server_app.rs      # Bind + graceful shutdown (Ctrl+C/SIGTERM)
+│       ├── domain.rs      # Módulo raiz de domínio
+│       ├── domain/game.rs # Struct Game (FromRow, campos privados)
+│       ├── repository.rs  # Módulo raiz de repositórios
+│       └── repository/game.rs # GameRepository (pool PgPool + all_games)
 └── .gitignore             # Arquivos ignorados pelo Git
 ```
 

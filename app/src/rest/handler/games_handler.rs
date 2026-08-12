@@ -3,7 +3,7 @@ use crate::rest::dto::game::{GamesRequest, GamesResponse};
 use axum::Json;
 use tracing::info;
 
-pub async fn get_games() -> Result<Json<Vec<GamesResponse>>, AppError> {
+pub async fn list_games() -> Result<Json<Vec<GamesResponse>>, AppError> {
     info!("Obtendo todos os games!");
 
     let game = GamesResponse {
