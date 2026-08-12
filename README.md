@@ -24,7 +24,7 @@ O projeto está em **estágio de API funcional com dados fixos e SQLx parcialmen
 - Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
 - Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
 - SQLx integrado ao `main.rs`: carrega o `.env` via `dotenvy`, cria o `PgPool` (feature `postgres`) e consulta a tabela `games` no startup (log `Games: [...]`).
-- Camadas `domain/` (`Game` com `FromRow`) e `repository/` (`GameRepository::get_all_games`).
+- Camadas `domain/` (`Game` com `FromRow`) e `repository/` (`GameRepository::all_games`).
 - **Ainda pendente:** o repositório não está ligado aos handlers — `GET /ff-codex/games` segue com dados fixos.
 
 A próxima etapa é injetar o `GameRepository` nos handlers do Axum via `State`, sempre com foco em aprender um conceito por vez.
@@ -45,7 +45,7 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 
 3. **Persistência com SQLx** 🔄 (em andamento)
    - Conectar ao PostgreSQL via Docker Compose (pool de conexões). ✅
-   - Executar migrações e consultas reais no código (pool + `GameRepository::get_all_games` no startup). ✅
+   - Executar migrações e consultas reais no código (pool + `GameRepository::all_games` no startup). ✅
    - Substituir os dados fixos dos handlers por consultas ao banco (injetar o `GameRepository` via `State`). 🔄
 
 4. **CRUD da API**
@@ -157,7 +157,7 @@ ff-codex/
 │       ├── domain.rs      # Módulo raiz de domínio
 │       ├── domain/game.rs # Struct Game (FromRow, campos privados)
 │       ├── repository.rs  # Módulo raiz de repositórios
-│       └── repository/game.rs # GameRepository (pool PgPool + get_all_games)
+│       └── repository/game.rs # GameRepository (pool PgPool + all_games)
 └── .gitignore             # Arquivos ignorados pelo Git
 ```
 

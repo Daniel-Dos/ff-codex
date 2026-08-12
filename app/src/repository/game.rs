@@ -10,7 +10,7 @@ impl GameRepository {
         Self { pool }
     }
 
-    pub async fn get_all_games(&self) -> Result<Vec<Game>, sqlx::Error> {
+    pub async fn all_games(&self) -> Result<Vec<Game>, sqlx::Error> {
         let games = sqlx::query_as("select * from games")
             .fetch_all(&self.pool)
             .await?;

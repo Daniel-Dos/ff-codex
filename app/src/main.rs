@@ -35,7 +35,7 @@ async fn main() -> Result<(), anyhow::Error> {
             })?,
     );
 
-    let games = banco.get_all_games().await?;
+    let games = banco.all_games().await?;
     info!("Games: {:?}", games);
 
     let app = router();
