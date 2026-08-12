@@ -1,11 +1,14 @@
 mod domain;
 mod repository;
 mod rest;
+mod service;
 
 use crate::rest::{router, server};
 use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
 
+use crate::rest::app_state::AppState;
+use crate::service::game_service::GameService;
 use tracing::{error, info};
 
 #[tokio::main]
@@ -35,10 +38,10 @@ async fn main() -> Result<(), anyhow::Error> {
             })?,
     );
 
-    let games = banco.all_games().await?;
-    info!("Games: {:?}", games);
+    let game_service = GameService::new(banco);
+    let app_state = AppState { game_service };
 
-    let app = router();
+    let app = router(app_state);
     server(app).await?;
 
     Ok(())
