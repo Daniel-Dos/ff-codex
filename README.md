@@ -12,7 +12,7 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 | [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Implementado (rotas `/health`, `/ready`, `/ff-codex/games`) |
 | [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (GET lê do banco) |
 
-> **Atenção:** o SQLx está integrado ao fluxo de leitura: `GET /ff-codex/games` consulta a tabela `games` via `State` + `GameService`. O `POST /ff-codex/games` ainda **não** persiste — ele devolve um eco do payload. A próxima etapa é persistir o cadastro (INSERT).
+> **Atenção:** o SQLx está integrado ao fluxo de leitura: `GET /ff-codex/games` consulta a tabela `games` via `State` + `GameService`, com filtro opcional por `?titulo=...` (busca parcial case-insensitive via `ILIKE`). O `POST /ff-codex/games` ainda **não** persiste — ele devolve um eco do payload. A próxima etapa é persistir o cadastro (INSERT).
 
 ## Status
 
@@ -23,8 +23,8 @@ O projeto está em **estágio de API funcional com leitura no banco (GET) e cada
 - Logs estruturados em JSON via `tracing`/`tracing-subscriber`.
 - Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
 - Migrações SQLx criadas em `migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
-- SQLx integrado: `.env` via `dotenvy`, `PgPool` (feature `postgres`) criado no `main.rs`, consulta `games` no startup (log `Games: [...]`) e **`GET /ff-codex/games` lê do banco** via `State` (`GameService` → `GameRepository`).
-- Camadas `domain/` (`Game` com `FromRow`), `repository/` (`GameRepository::all_games`), `service/` (`GameService`) e `rest/app_state.rs` (`AppState`) — o `GameService` retorna domínio e a conversão `Game` → `GamesResponse` acontece no handler (camada de apresentação).
+- SQLx integrado: `.env` via `dotenvy`, `PgPool` (feature `postgres`) criado no `main.rs` e **`GET /ff-codex/games` lê do banco** via `State` (`GameService` → `GameRepository`). O query param `titulo` filtra por título (busca parcial case-insensitive via `ILIKE`); sem filtro → lista completa; sem match → `200 []`.
+- Camadas `domain/` (`Game` com `FromRow`), `repository/` (`GameRepository::all_games`/`games_by_titulo`), `service/` (`GameService`) e `rest/app_state.rs` (`AppState`) — o `GameService` retorna domínio e a conversão `Game` → `GamesResponse` acontece no handler (camada de apresentação).
 - **Ainda pendente:** `POST /ff-codex/games` devolve um eco do payload — a persistência (INSERT) é a próxima etapa.
 
 As próximas etapas adicionam a escrita (INSERT no POST), sempre com foco em aprender um conceito por vez.
@@ -45,9 +45,10 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 
 3. **Persistência com SQLx** 🔄 (em andamento)
    - Conectar ao PostgreSQL via Docker Compose (pool de conexões). ✅
-   - Executar migrações e consultas reais no código (`GameRepository::all_games` no startup). ✅
-   - Ligar o repositório aos handlers via `State` (`GameService` + `AppState`) — `GET /ff-codex/games` lê do banco. ✅
-   - Persistir o cadastro no `POST /ff-codex/games` (INSERT). 🔄
+   - Executar migrações e consultas reais no código (`GameRepository::all_games` no GET). ✅
+    - Ligar o repositório aos handlers via `State` (`GameService` + `AppState`) — `GET /ff-codex/games` lê do banco. ✅
+    - Filtrar a lista por título via query param (`GET /ff-codex/games?titulo=...`, busca parcial case-insensitive via `ILIKE`). ✅
+    - Persistir o cadastro no `POST /ff-codex/games` (INSERT). 🔄
 
 4. **CRUD da API**
    - Implementar operações de criação, leitura, atualização e exclusão para as entidades.
@@ -99,14 +100,13 @@ Notas:
 
 - O banco é **efêmero**: o `docker-compose.yml` não define volume persistente, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
 - O `DATABASE_URL` do `.env` aponta para `localhost:5432` (mesma porta mapeada pelo `docker-compose.yml`).
-- **`cargo run` agora exige o banco de pé:** o `main.rs` conecta ao PostgreSQL e consulta a tabela `games` no startup. Se o banco estiver parado ou o `DATABASE_URL` não estiver definido no `.env`, o programa logga o erro e encerra antes de subir o servidor.
+- **`cargo run` agora exige o banco de pé:** o `main.rs` conecta ao PostgreSQL no startup. Se o banco estiver parado ou o `DATABASE_URL` não estiver definido no `.env`, o programa logga o erro e encerra antes de subir o servidor.
 - Para parar o banco: `docker compose down`.
 
 A saída esperada ao executar `cargo run` é uma sequência de logs estruturados em JSON, por exemplo:
 
 ```json
 {"timestamp":"...","level":"INFO","fields":{"message":"Iniciando a api de Final Fantasy."},"target":"ff_codex"}
-{"timestamp":"...","level":"INFO","fields":{"message":"Games: [Game { id: 1, titulo: \"Final Fantasy\", ano_lancamento: 1987 }, Game { id: 2, titulo: \"Final Fantasy II\", ano_lancamento: 1988 }, ...]"},"target":"ff_codex"}
 {"timestamp":"...","level":"INFO","fields":{"message":"Server starting on http://0.0.0.0:8080"},"target":"ff_codex::rest::server_app"}
 ```
 
@@ -116,6 +116,7 @@ Para testar a API com o servidor de pé:
 curl http://localhost:8080/health
 curl http://localhost:8080/ready
 curl http://localhost:8080/ff-codex/games
+curl "http://localhost:8080/ff-codex/games?titulo=vii"
 ```
 
 ## Endpoints
@@ -124,10 +125,10 @@ curl http://localhost:8080/ff-codex/games
 |--------|------|-----------|----------|
 | GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` |
 | GET | `/ready` | Prontidão do serviço | `200` (sem corpo) |
-| GET | `/ff-codex/games` | Lista de jogos do banco (via `GameService`) | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
+| GET | `/ff-codex/games?titulo=...` | Lista de jogos do banco (via `GameService`); `titulo` filtra por título — busca parcial case-insensitive via `ILIKE`; sem filtro → lista completa; sem match → `200 []` | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
 | POST | `/ff-codex/games` | Cadastra um jogo (eco, sem persistência) | `200` corpo ecoado |
 
-> `GET /ff-codex/games` lê da tabela `games` (SQLx). O `POST` ainda não persiste — devolve um eco do payload; a persistência (INSERT) é a próxima etapa.
+> `GET /ff-codex/games` lê da tabela `games` (SQLx). O query param `titulo` (opcional, DTO `GamesQuery`) faz busca parcial case-insensitive via `ILIKE`; sem filtro → lista completa; sem match → `200 []`. O `POST` ainda não persiste — devolve um eco do payload; a persistência (INSERT) é a próxima etapa.
 
 ## Estrutura do projeto
 
@@ -148,7 +149,7 @@ ff-codex/
 │       ├── rest.rs        # Módulo raiz da API (re-exports)
 │       ├── rest/
 │       │   ├── app_state.rs       # AppState (GameService) injetado via State
-│       │   ├── dto.rs             # DTOs (GamesRequest, GamesResponse)
+│       │   ├── dto.rs             # DTOs (GamesRequest, GamesQuery, GamesResponse)
 │       │   ├── dto/game.rs        # DTOs + impl From<Game> for GamesResponse
 │       │   ├── error.rs           # AppError + IntoResponse centralizado
 │       │   ├── handler.rs         # Handlers (health, ready, games)
@@ -159,9 +160,9 @@ ff-codex/
 │       ├── domain.rs      # Módulo raiz de domínio
 │       ├── domain/game.rs # Struct Game (FromRow, campos pub)
 │       ├── repository.rs  # Módulo raiz de repositórios
-│       ├── repository/game.rs # GameRepository (pool PgPool + all_games)
+│       ├── repository/game.rs # GameRepository (pool PgPool + all_games + games_by_titulo)
 │       ├── service.rs     # Módulo raiz de serviços
-│       └── service/game_service.rs # GameService (GameError + all_games)
+│       └── service/game_service.rs # GameService (GameError + all_games + games_by_titulo)
 └── .gitignore             # Arquivos ignorados pelo Git
 ```
 

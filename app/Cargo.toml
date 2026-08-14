@@ -3,13 +3,6 @@ name = "ff-codex"
 version = "0.1.0"
 edition = "2024"
 
-[profile.dev]
-debug = 1
-split-debuginfo = "unpacked"
-codegen-units = 256
-incremental=false
-opt-level=0
-
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

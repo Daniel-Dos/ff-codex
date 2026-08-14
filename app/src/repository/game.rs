@@ -18,4 +18,13 @@ impl GameRepository {
 
         Ok(games)
     }
+
+    pub async fn games_by_titulo(&self, titulo: &str) -> Result<Vec<Game>, sqlx::Error> {
+        let games = sqlx::query_as("select * from games where titulo ilike '%' || $1 || '%'")
+            .bind(titulo)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(games)
+    }
 }

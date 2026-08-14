@@ -8,6 +8,11 @@ pub struct GamesRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GamesQuery {
+    pub titulo: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GamesResponse {
     pub titulo: String,
     pub ano_lancamento: i32,
