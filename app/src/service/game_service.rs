@@ -32,4 +32,11 @@ impl GameService {
             .await
             .map_err(GameError::from)
     }
+
+    pub async fn create_game(&self, titulo: &str, ano_lancamento: i32) -> Result<Game, GameError> {
+        self.db
+            .create_game(titulo, ano_lancamento)
+            .await
+            .map_err(GameError::from)
+    }
 }

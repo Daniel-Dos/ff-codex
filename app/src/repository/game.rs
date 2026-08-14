@@ -27,4 +27,16 @@ impl GameRepository {
 
         Ok(games)
     }
+
+    pub async fn create_game(&self, titulo: &str, lancamento: i32) -> Result<Game, sqlx::Error> {
+        let game = sqlx::query_as(
+            "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
+        )
+            .bind(titulo)
+            .bind(lancamento)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(game)
+    }
 }
