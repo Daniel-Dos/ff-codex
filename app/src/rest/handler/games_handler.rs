@@ -3,6 +3,7 @@ use crate::rest::app_state::AppState;
 use crate::rest::dto::game::{GamesQuery, GamesRequest, GamesResponse};
 use axum::Json;
 use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use tracing::info;
 
 pub async fn list_games(
@@ -48,13 +49,23 @@ async fn list_all(state: AppState) -> Result<Json<Vec<GamesResponse>>, AppError>
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
 }
 
-pub async fn create_games(payload: Json<GamesRequest>) -> Result<Json<GamesResponse>, AppError> {
+pub async fn create_games(
+    State(state): State<AppState>,
+    payload: Json<GamesRequest>,
+) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
     info!("Cadastrando um novo game: {}", payload.titulo);
 
-    let novo_game = GamesResponse {
-        titulo: payload.titulo.clone(),
-        ano_lancamento: payload.ano_lancamento,
-    };
+    let game_id = state
+        .game_service
+        .create_game(&payload.titulo, payload.ano_lancamento)
+        .await
+        .map(|game| game.id)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao criar o game: {}", e)))?;
 
-    Ok(Json(novo_game))
+    info!(
+        "O game {} foi cadastrado com sucesso, e o seu id é: {}",
+        payload.titulo, game_id
+    );
+
+    Ok((StatusCode::CREATED, payload))
 }
