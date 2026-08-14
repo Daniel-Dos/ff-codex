@@ -32,10 +32,10 @@ impl GameRepository {
         let game = sqlx::query_as(
             "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
         )
-            .bind(titulo)
-            .bind(lancamento)
-            .fetch_one(&self.pool)
-            .await?;
+        .bind(titulo)
+        .bind(lancamento)
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(game)
     }

@@ -49,18 +49,23 @@ async fn list_all(state: AppState) -> Result<Json<Vec<GamesResponse>>, AppError>
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
 }
 
-pub async fn create_games(State(state): State<AppState>, payload: Json<GamesRequest>) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
+pub async fn create_games(
+    State(state): State<AppState>,
+    payload: Json<GamesRequest>,
+) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
     info!("Cadastrando um novo game: {}", payload.titulo);
 
-    let game_id = state.game_service
+    let game_id = state
+        .game_service
         .create_game(&payload.titulo, payload.ano_lancamento)
         .await
-        .map(|game| {
-            game.id
-        })
+        .map(|game| game.id)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao criar o game: {}", e)))?;
 
-    info!("O game {} foi cadastrado com sucesso, e o seu id é: {}", payload.titulo, game_id);
+    info!(
+        "O game {} foi cadastrado com sucesso, e o seu id é: {}",
+        payload.titulo, game_id
+    );
 
     Ok((StatusCode::CREATED, payload))
 }
