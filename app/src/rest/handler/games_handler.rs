@@ -16,9 +16,15 @@ pub async fn list_games(
         .map(str::trim)
         .filter(|t| !t.is_empty());
 
-    match titulo {
-        Some(t) => games_by_titulo(state, t).await,
-        None => list_all(state).await,
+    let lancamento = params.lancamento;
+
+    match (titulo, lancamento) {
+        (Some(t), Some(a)) => games_by_titulo_and_lancamento(state, t, a).await,
+        (Some(t), None) => games_by_titulo(state, t).await,
+        (None, Some(_)) => Err(AppError::BadRequest(
+            "Informe o título para filtrar por ano de lançamento".to_string(),
+        )),
+        (None, None) => list_all(state).await,
     }
 }
 
@@ -34,6 +40,24 @@ async fn games_by_titulo(
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao obter os games: {}", e)))?;
 
+    Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
+}
+
+async fn games_by_titulo_and_lancamento(
+    state: AppState,
+    titulo: &str,
+    lancamento: i32,
+) -> Result<Json<Vec<GamesResponse>>, AppError> {
+    info!(
+        "Buscando games com o titulo: {} e ano de lançamento: {}",
+        titulo, lancamento
+    );
+
+    let games = state
+        .game_service
+        .games_by_titulo_and_lancamento(titulo, lancamento)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao obter os games: {}", e)))?;
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
 }
 
