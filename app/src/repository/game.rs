@@ -28,6 +28,21 @@ impl GameRepository {
         Ok(games)
     }
 
+    pub async fn games_by_titulo_and_lancamento(
+        &self,
+        titulo: &str,
+        lancamento: i32,
+    ) -> Result<Vec<Game>, sqlx::Error> {
+        let games = sqlx::query_as(
+            "select * from games where titulo ilike '%' || $1 || '%' and ano_lancamento = $2",
+        )
+        .bind(titulo)
+        .bind(lancamento)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(games)
+    }
+
     pub async fn create_game(&self, titulo: &str, lancamento: i32) -> Result<Game, sqlx::Error> {
         let game = sqlx::query_as(
             "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
