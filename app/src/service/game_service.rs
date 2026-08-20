@@ -33,6 +33,13 @@ impl GameService {
             .map_err(GameError::from)
     }
 
+    pub async fn games_by_lancamento(&self, lancamento: i32) -> Result<Vec<Game>, GameError> {
+        self.db
+            .games_by_lancamento(lancamento)
+            .await
+            .map_err(GameError::from)
+    }
+
     pub async fn games_by_titulo_and_lancamento(
         &self,
         titulo: &str,
