@@ -44,10 +44,10 @@ impl GameRepository {
         let games = sqlx::query_as(
             "select * from games where titulo ilike '%' || $1 || '%' and ano_lancamento = $2",
         )
-            .bind(titulo)
-            .bind(lancamento)
-            .fetch_all(&self.pool)
-            .await?;
+        .bind(titulo)
+        .bind(lancamento)
+        .fetch_all(&self.pool)
+        .await?;
         Ok(games)
     }
 
@@ -55,10 +55,10 @@ impl GameRepository {
         let game = sqlx::query_as(
             "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
         )
-            .bind(titulo)
-            .bind(lancamento)
-            .fetch_one(&self.pool)
-            .await?;
+        .bind(titulo)
+        .bind(lancamento)
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(game)
     }
