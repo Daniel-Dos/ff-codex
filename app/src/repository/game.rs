@@ -62,4 +62,13 @@ impl GameRepository {
 
         Ok(game)
     }
+
+    pub async fn delete_game(&self, id: i32) -> Result<(), sqlx::Error> {
+        sqlx::query("delete from games where id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
 }

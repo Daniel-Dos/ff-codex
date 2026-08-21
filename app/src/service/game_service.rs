@@ -57,4 +57,8 @@ impl GameService {
             .await
             .map_err(GameError::from)
     }
+
+    pub async fn delete_game_by_id(&self, id: i32) -> Result<(), GameError> {
+        self.db.delete_game(id).await.map_err(GameError::from)
+    }
 }
