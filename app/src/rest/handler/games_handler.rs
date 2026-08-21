@@ -93,9 +93,9 @@ pub async fn create_games(
 ) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
     info!("Cadastrando um novo game: {}", payload.titulo);
 
-    payload.validate().map_err(|e| {
-        AppError::BadRequest(format!("Dados inválidos: {}", e))
-    })?;
+    payload
+        .validate()
+        .map_err(|e| AppError::BadRequest(format!("Dados inválidos: {}", e)))?;
 
     let game_id = state
         .game_service
@@ -112,12 +112,20 @@ pub async fn create_games(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
-pub async fn delete_game(State(state): State<AppState>, Path(id): Path<i32>) -> Result<(StatusCode, String), AppError> {
+pub async fn delete_game(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<(StatusCode, String), AppError> {
     warn!("Deletando o game com id: {}", id);
 
-    state.game_service.delete_game_by_id(id)
+    state
+        .game_service
+        .delete_game_by_id(id)
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao deletar o game: {}", e)))?;
 
-    Ok((StatusCode::OK, format!("Game com id {} deletado com sucesso!", id)))
+    Ok((
+        StatusCode::OK,
+        format!("Game com id {} deletado com sucesso!", id),
+    ))
 }
