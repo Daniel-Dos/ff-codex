@@ -1,9 +1,15 @@
 use crate::domain::game::Game;
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 pub struct GamesRequest {
+    #[validate(length(min = 1, message = "O título do jogo não pode ser vazio"))]
     pub titulo: String,
+    #[validate(range(
+        min = 1,
+        message = "O ano de lançamento do jogo deve ser maior que 0"
+    ))]
     pub ano_lancamento: i32,
 }
 

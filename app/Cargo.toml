@@ -14,3 +14,4 @@ axum = { version = "0.8.9" }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "1.0"
 dotenvy = "0.15.7"
+validator = { version = "0.21.0", features = ["derive"] }

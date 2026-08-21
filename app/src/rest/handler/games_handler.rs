@@ -2,9 +2,10 @@ use crate::rest::AppError;
 use crate::rest::app_state::AppState;
 use crate::rest::dto::game::{GamesQuery, GamesRequest, GamesResponse};
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use tracing::info;
+use tracing::{info, warn};
+use validator::Validate;
 
 pub async fn list_games(
     State(state): State<AppState>,
@@ -88,9 +89,13 @@ async fn list_all(state: AppState) -> Result<Json<Vec<GamesResponse>>, AppError>
 
 pub async fn create_games(
     State(state): State<AppState>,
-    payload: Json<GamesRequest>,
+    Json(payload): Json<GamesRequest>,
 ) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
     info!("Cadastrando um novo game: {}", payload.titulo);
+
+    payload.validate().map_err(|e| {
+        AppError::BadRequest(format!("Dados inválidos: {}", e))
+    })?;
 
     let game_id = state
         .game_service
@@ -104,5 +109,15 @@ pub async fn create_games(
         payload.titulo, game_id
     );
 
-    Ok((StatusCode::CREATED, payload))
+    Ok((StatusCode::CREATED, Json(payload)))
+}
+
+pub async fn delete_game(State(state): State<AppState>, Path(id): Path<i32>) -> Result<(StatusCode, String), AppError> {
+    warn!("Deletando o game com id: {}", id);
+
+    state.game_service.delete_game_by_id(id)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Erro ao deletar o game: {}", e)))?;
+
+    Ok((StatusCode::OK, format!("Game com id {} deletado com sucesso!", id)))
 }
