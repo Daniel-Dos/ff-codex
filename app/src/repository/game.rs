@@ -63,12 +63,21 @@ impl GameRepository {
         Ok(game)
     }
 
-    pub async fn delete_game(&self, id: i32) -> Result<(), sqlx::Error> {
-        sqlx::query("delete from games where id = $1")
+    pub async fn delete_game(&self, id: i32) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query("delete from games where id = $1")
             .bind(id)
             .execute(&self.pool)
             .await?;
 
-        Ok(())
+        Ok(result.rows_affected())
+    }
+
+    pub async fn games_by_id(&self, id: i32) -> Result<Game, sqlx::Error> {
+        let game = sqlx::query_as("select * from games where id = $1")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(game)
     }
 }

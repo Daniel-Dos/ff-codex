@@ -13,7 +13,7 @@ pub struct ErrorBody {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum AppError {
-    NotFound,
+    NotFound(String),
     BadRequest(String),
     Internal(anyhow::Error),
 }
@@ -21,7 +21,7 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::NotFound => (StatusCode::NOT_FOUND, "Recurso não encontrado".to_string()),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::Internal(err) => {
                 tracing::error!("Erro interno: {err:#}");

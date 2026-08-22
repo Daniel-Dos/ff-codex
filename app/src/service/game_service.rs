@@ -9,8 +9,6 @@ pub struct GameService {
 
 #[derive(Error, Debug)]
 pub enum GameError {
-    // Variante reservada para uso futuro (ex.: GET /games/{id}); ainda não construída.
-    #[expect(dead_code, reason = "NotFound será usado quando houver busca por id")]
     #[error("Game not found")]
     NotFound,
     #[error("internal database error: {0}")]
@@ -59,6 +57,16 @@ impl GameService {
     }
 
     pub async fn delete_game_by_id(&self, id: i32) -> Result<(), GameError> {
-        self.db.delete_game(id).await.map_err(GameError::from)
+        let rows_affected = self.db.delete_game(id).await.map_err(GameError::from)?;
+
+        if rows_affected == 0 {
+            return Err(GameError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    pub async fn game_by_id(&self, id: i32) -> Result<Game, GameError> {
+        self.db.games_by_id(id).await.map_err(GameError::from)
     }
 }
