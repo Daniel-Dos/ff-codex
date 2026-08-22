@@ -22,9 +22,26 @@ pub struct GamesResponse {
     pub ano_lancamento: i32,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GameDetailResponse {
+    pub id: i32,
+    pub titulo: String,
+    pub ano_lancamento: i32,
+}
+
 impl From<Game> for GamesResponse {
     fn from(game: Game) -> Self {
         Self {
+            titulo: game.titulo,
+            ano_lancamento: game.ano_lancamento,
+        }
+    }
+}
+
+impl From<Game> for GameDetailResponse {
+    fn from(game: Game) -> Self {
+        Self {
+            id: game.id,
             titulo: game.titulo,
             ano_lancamento: game.ano_lancamento,
         }
