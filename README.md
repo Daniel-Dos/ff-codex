@@ -29,15 +29,15 @@ O projeto está em **estágio de CRUD funcional para a entidade `games`**:
 - SQLx integrado: `.env` via `dotenvy`, `PgPool` (feature `postgres`) criado no `main.rs` e exposto via `State` (`GameService` → `GameRepository`).
 - **Implementado:**
   - `GET /ff-codex/games` — lista do banco com filtros opcionais `titulo` (parcial, `ILIKE`) e `lancamento` (igualdade); sem filtros → lista completa; sem match → `200 []`.
-  - `POST /ff-codex/games` — persiste o cadastro no banco (`INSERT ... RETURNING *`); payload validado por `validator` (`titulo` não vazio, `ano_lancamento > 0`); responde `201` ecoando o payload.
+   - `POST /ff-codex/games` — persiste o cadastro no banco (`INSERT ... RETURNING *`); payload validado por `validator` (`titulo` não vazio, `ano_lancamento > 0`); erros de validação retornam JSON estruturado com detalhes por campo; responde `201` ecoando o payload.
   - `GET /ff-codex/games/{id}` — busca um jogo por id; valida `id > 0` (`400`) e responde `404` quando não encontrado.
   - `DELETE /ff-codex/games/{id}` — remove um jogo por id; responde `404` quando não encontrado.
 - Camadas separadas:
   - `domain/` — `Game` com `#[derive(FromRow, Debug)]`, campos `pub` (`id`, `titulo`, `ano_lancamento`).
   - `repository/` — `GameRepository { pool: PgPool }` com `all_games`, `games_by_titulo`, `games_by_lancamento`, `games_by_titulo_and_lancamento`, `games_by_id`, `create_game`, `delete_game`.
   - `service/` — `GameService` com `GameError` (`thiserror`: `NotFound`, `Internal(#[from] sqlx::Error)`); retorna **domínio**, nunca DTO.
-  - `rest/` — `AppState` (`#[derive(Clone)]`), DTOs (`GamesRequest`, `GamesQuery`, `GamesResponse`, `GameDetailResponse`) com `impl From<Game>` para as respostas, `AppError` centralizado com `IntoResponse` (`NotFound`, `BadRequest`, `Internal`), `validator` aplicado no handler do `POST`.
-- Erros centralizados em `src/rest/error.rs`: `AppError` mapeia para status HTTP (`404`, `400`, `500`) e corpo JSON `{ "error": "...", "code": <status> }`. `Internal` é logado via `tracing::error!`.
+   - `rest/` — `AppState` (`#[derive(Clone)]`), DTOs (`GamesRequest`, `GamesQuery`, `GamesResponse`, `GameDetailResponse`) com `impl From<Game>` para as respostas, `AppError` centralizado com `IntoResponse` (`NotFound`, `BadRequest`, `Validation`, `Internal`), `validator` aplicado no handler do `POST`.
+- Erros centralizados em `src/rest/error.rs`: `AppError` mapeia para status HTTP (`404`, `400`, `500`) com dois formatos de JSON: erros gerais usam `{"error":"...","code":<status>}`; erros de validação usam `{"erro":"validacao_falhou","campos":[{"campo":"...","codigo":"...","mensagem":"..."}]}`. `Internal` é logado via `tracing::error!`.
 
 As próximas etapas completam o CRUD de `games` (PUT) e abrem espaço para as entidades temáticas do universo *Final Fantasy*.
 
@@ -195,7 +195,7 @@ sequenceDiagram
     H->>V: payload.validate()
     alt dados inválidos
         V-->>H: ValidationError
-        H-->>C: 400 {"error":"Dados inválidos: ...","code":400}
+        H-->>C: 400 {"erro":"validacao_falhou","campos":[{"campo":"titulo","codigo":"titulo_vazio","mensagem":"..."}]}
     else dados válidos
         V-->>H: OK
         H->>S: create_game(titulo, ano_lancamento)
@@ -342,16 +342,16 @@ curl -X DELETE http://localhost:8080/ff-codex/games/1
 
 ## Endpoints
 
-| Método | Rota | Descrição | Resposta |
-|--------|------|-----------|----------|
-| GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` |
-| GET | `/ready` | Prontidão do serviço | `200` (sem corpo) |
-| GET | `/ff-codex/games` | Lista de jogos do banco; aceita `?titulo=` (parcial case-insensitive via `ILIKE`) e/ou `?lancamento=` (igualdade) — sem filtros → lista completa; sem match → `200 []` | `200` `[{"titulo":"Final Fantasy VII","ano_lancamento":1997}]` |
-| POST | `/ff-codex/games` | Cadastra um jogo (INSERT com `RETURNING *`); payload validado (`titulo` não vazio, `ano_lancamento > 0`); resposta ecoa o payload | `201` `{"titulo":"...","ano_lancamento":...}` |
-| GET | `/ff-codex/games/{id}` | Busca um jogo por id (`id > 0`) | `200` `{"id":...,"titulo":"...","ano_lancamento":...}` ou `404` |
-| DELETE | `/ff-codex/games/{id}` | Remove um jogo por id | `200` `"Game com id N deletado com sucesso!"` ou `404` |
+| Método | Rota | Descrição | Sucesso | Erros |
+|--------|------|-----------|---------|-------|
+| GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` | — |
+| GET | `/ready` | Prontidão do serviço | `200` (sem corpo) | — |
+| GET | `/ff-codex/games` | Lista de jogos; filtros opcionais `?titulo=` (ILIKE) e `?lancamento=` (igualdade) | `200` `[{"titulo":"...","ano_lancamento":...}]` | `500` Erro interno |
+| POST | `/ff-codex/games` | Cadastra um jogo; payload validado (`titulo` não vazio, `ano_lancamento > 0`) | `201` `{"titulo":"...","ano_lancamento":...}` | `400` Validação estruturada, `500` Erro interno |
+| GET | `/ff-codex/games/{id}` | Busca um jogo por id | `200` `{"id":...,"titulo":"...","ano_lancamento":...}` | `400` Id inválido, `404` Não encontrado, `500` Erro interno |
+| DELETE | `/ff-codex/games/{id}` | Remove um jogo por id | `200` `"Game com id N deletado com sucesso!"` | `404` Não encontrado, `500` Erro interno |
 
-> Os endpoints `/ff-codex/games` e `/ff-codex/games/{id}` leem e escrevem na tabela `games` via SQLx, com `AppError` centralizado retornando `{"error":"...","code":<status>}`.
+> Erros de validação (POST) retornam formato estruturado: `{"erro":"validacao_falhou","campos":[{"campo":"...","codigo":"...","mensagem":"..."}]}`. Demais erros usam: `{"error":"...","code":<status>}`.
 
 ### POST /ff-codex/games
 
@@ -377,10 +377,21 @@ Cadastra um novo jogo na tabela `games` (INSERT com `RETURNING *`). O `id` é ge
 
 **Erros:**
 
-- `400 Bad Request` — payload inválido (campo ausente, `titulo` vazio ou `ano_lancamento <= 0`) via `AppError::BadRequest`. Corpo: `{"error":"Dados inválidos: <detalhes>","code":400}`.
+- `400 Bad Request` — payload inválido (`titulo` vazio ou `ano_lancamento <= 0`). Retorna JSON estruturado com detalhes por campo:
+  ```json
+  {
+    "erro": "validacao_falhou",
+    "campos": [
+      { "campo": "titulo", "codigo": "titulo_vazio", "mensagem": "O título do jogo não pode ser vazio" },
+      { "campo": "ano_lancamento", "codigo": "ano_invalido", "mensagem": "O ano de lançamento do jogo deve ser maior que 0" }
+    ]
+  }
+  ```
 - `500 Internal Server Error` — falha no banco de dados via `AppError::Internal` (logado com `tracing::error!`). Corpo: `{"error":"Erro interno do servidor","code":500}`.
 
-Exemplo com `curl`:
+**Exemplos com `curl`:**
+
+Sucesso:
 
 ```bash
 curl -X POST http://localhost:8080/ff-codex/games \
@@ -388,24 +399,83 @@ curl -X POST http://localhost:8080/ff-codex/games \
   -d '{"titulo":"Final Fantasy Tactics","ano_lancamento":1997}'
 ```
 
-### GET /ff-codex/games/{id}
-
-Busca um jogo pelo `id` no banco. `id <= 0` é rejeitado com `400`. Quando o jogo não existe, responde `404` com `{"error":"Game com id N não encontrado","code":404}`.
-
-Exemplo com `curl`:
+Validação falhou:
 
 ```bash
-curl http://localhost:8080/ff-codex/games/7
+curl -X POST http://localhost:8080/ff-codex/games \
+  -H "Content-Type: application/json" \
+  -d '{"titulo":"","ano_lancamento":0}'
+```
+
+### GET /ff-codex/games/{id}
+
+Busca um jogo pelo `id` no banco.
+
+**Response (200):**
+
+```json
+{
+  "id": 1,
+  "titulo": "Final Fantasy VII",
+  "ano_lancamento": 1997
+}
+```
+
+**Erros:**
+
+- `400 Bad Request` — `id <= 0`. Corpo: `{"error":"O id do game não pode ser vazio ou menor que 1","code":400}`.
+- `404 Not Found` — jogo não encontrado. Corpo: `{"error":"Game com id N não encontrado","code":404}`.
+- `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+
+**Exemplos com `curl`:**
+
+Sucesso:
+
+```bash
+curl http://localhost:8080/ff-codex/games/1
+```
+
+Id inválido:
+
+```bash
+curl http://localhost:8080/ff-codex/games/0
+```
+
+Não encontrado:
+
+```bash
+curl http://localhost:8080/ff-codex/games/999
 ```
 
 ### DELETE /ff-codex/games/{id}
 
-Remove um jogo pelo `id` no banco. Quando o jogo não existe, responde `404` com `{"error":"Game com id N não encontrado para deleção","code":404}`.
+Remove um jogo pelo `id` no banco.
 
-Exemplo com `curl`:
+**Response (200):**
+
+```
+Game com id 1 deletado com sucesso!
+```
+
+> Nota: este endpoint retorna texto plano (`text/plain`), não JSON.
+
+**Erros:**
+
+- `404 Not Found` — jogo não encontrado. Corpo: `{"error":"Game com id N não encontrado para deleção","code":404}`.
+- `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+
+**Exemplos com `curl`:**
+
+Sucesso:
 
 ```bash
-curl -X DELETE http://localhost:8080/ff-codex/games/7
+curl -X DELETE http://localhost:8080/ff-codex/games/1
+```
+
+Não encontrado:
+
+```bash
+curl -X DELETE http://localhost:8080/ff-codex/games/999
 ```
 
 ## Estrutura do projeto
@@ -429,7 +499,7 @@ ff-codex/
 │       │   ├── app_state.rs              # AppState (GameService) injetado via State
 │       │   ├── dto.rs                    # Módulo raiz dos DTOs
 │       │   ├── dto/game.rs               # DTOs (GamesRequest/Query/Response/DetailResponse) + validator + impl From<Game>
-│       │   ├── error.rs                  # AppError + IntoResponse centralizado (404/400/500)
+│       │   ├── error.rs                  # AppError + IntoResponse centralizado (NotFound/BadRequest/Validation/Internal)
 │       │   ├── handler.rs                # Módulo raiz dos handlers
 │       │   ├── handler/health.rs         # GET /health e GET /ready
 │       │   ├── handler/games_handler.rs  # GET lista (com filtros) / GET por id / POST / DELETE

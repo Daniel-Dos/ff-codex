@@ -121,9 +121,7 @@ pub async fn create_games(
 ) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
     info!("Cadastrando um novo game: {}", payload.titulo);
 
-    payload
-        .validate()
-        .map_err(|e| AppError::BadRequest(format!("Dados inválidos: {}", e)))?;
+    payload.validate()?;
 
     let game_id = state
         .game_service
