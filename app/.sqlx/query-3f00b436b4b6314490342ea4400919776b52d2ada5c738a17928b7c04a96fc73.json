@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "titulo",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "ano_lancamento",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3f00b436b4b6314490342ea4400919776b52d2ada5c738a17928b7c04a96fc73"
+}

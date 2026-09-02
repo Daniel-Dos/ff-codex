@@ -26,7 +26,7 @@ services:
     image: nxyt/sqlx-cli
     depends_on:
       postgres:
-       condition: service_healthy
+        condition: service_healthy
     command: sqlx migrate run
     volumes:
       - ./migrations:/migrations
@@ -34,6 +34,26 @@ services:
       - DATABASE_URL=postgres://ff-codex:ff-codex@postgres:5432/ff-codex-db?sslmode=disable
     networks:
       - ff-codex-net
+    # NOVO SERVIÇO PARA GERAR O JSON
+  prepare:
+    image: rust:1.98-alpine # Use a versão do Rust que você usa localmente
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app # Monta todo o projeto para ler o código e salvar o json
+    working_dir: /app
+    environment:
+      - DATABASE_URL=postgres://ff-codex:ff-codex@postgres:5432/ff-codex-db?sslmode=disable
+    # Instala o sqlx-cli e roda o prepare
+    command: >
+      sh -c "cargo install sqlx-cli --no-default-features --features postgres && 
+             cargo sqlx prepare"
+    networks:
+      - ff-codex-net
+
 networks:
   ff-codex-net:
     driver: bridge
