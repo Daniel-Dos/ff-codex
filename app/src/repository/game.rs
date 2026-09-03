@@ -25,8 +25,8 @@ impl GameRepository {
             "select * from games where titulo ilike '%' || $1 || '%'",
             titulo
         )
-            .fetch_all(&self.pool)
-            .await?;
+        .fetch_all(&self.pool)
+        .await?;
 
         Ok(games)
     }
@@ -37,8 +37,8 @@ impl GameRepository {
             "select * from games where ano_lancamento = $1",
             lancamento
         )
-            .fetch_all(&self.pool)
-            .await?;
+        .fetch_all(&self.pool)
+        .await?;
         Ok(games)
     }
 
@@ -53,8 +53,8 @@ impl GameRepository {
             titulo,
             lancamento
         )
-            .fetch_all(&self.pool)
-            .await?;
+        .fetch_all(&self.pool)
+        .await?;
         Ok(games)
     }
 
@@ -65,8 +65,8 @@ impl GameRepository {
             titulo,
             lancamento
         )
-            .fetch_one(&self.pool)
-            .await?;
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(game)
     }
