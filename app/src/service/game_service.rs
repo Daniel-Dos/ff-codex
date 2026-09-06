@@ -24,34 +24,31 @@ impl GameService {
         self.db.all_games().await.map_err(GameError::from)
     }
 
-    pub async fn games_by_titulo(&self, titulo: &str) -> Result<Vec<Game>, GameError> {
+    pub async fn games_by_title(&self, title: &str) -> Result<Vec<Game>, GameError> {
+        self.db.games_by_title(title).await.map_err(GameError::from)
+    }
+
+    pub async fn games_by_release_year(&self, release_year: i32) -> Result<Vec<Game>, GameError> {
         self.db
-            .games_by_titulo(titulo)
+            .games_by_release_year(release_year)
             .await
             .map_err(GameError::from)
     }
 
-    pub async fn games_by_lancamento(&self, lancamento: i32) -> Result<Vec<Game>, GameError> {
-        self.db
-            .games_by_lancamento(lancamento)
-            .await
-            .map_err(GameError::from)
-    }
-
-    pub async fn games_by_titulo_and_lancamento(
+    pub async fn games_by_title_and_release_year(
         &self,
-        titulo: &str,
-        lancamento: i32,
+        title: &str,
+        release_year: i32,
     ) -> Result<Vec<Game>, GameError> {
         self.db
-            .games_by_titulo_and_lancamento(titulo, lancamento)
+            .games_by_title_and_release_year(title, release_year)
             .await
             .map_err(GameError::from)
     }
 
-    pub async fn create_game(&self, titulo: &str, ano_lancamento: i32) -> Result<Game, GameError> {
+    pub async fn create_game(&self, title: &str, release_year: i32) -> Result<Game, GameError> {
         self.db
-            .create_game(titulo, ano_lancamento)
+            .create_game(title, release_year)
             .await
             .map_err(GameError::from)
     }

@@ -30,6 +30,7 @@ pub enum AppError {
     BadRequest(String),
     Validation(ValidationErrorResponse),
     Internal(anyhow::Error),
+    Conflict(String),
 }
 
 impl IntoResponse for AppError {
@@ -58,6 +59,13 @@ impl IntoResponse for AppError {
                 });
                 (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
             }
+            AppError::Conflict(msg) => {
+                let body = Json(ErrorBody {
+                    error: msg,
+                    code: StatusCode::CONFLICT.as_u16(),
+                });
+                (StatusCode::CONFLICT, body).into_response()
+            }
         }
     }
 }
@@ -65,6 +73,29 @@ impl IntoResponse for AppError {
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
         AppError::Internal(err)
+    }
+}
+
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        if let sqlx::Error::Database(ref db_err) = err
+            && let Some(code) = db_err.code()
+        {
+            match code.as_ref() {
+                "23505" => {
+                    tracing::warn!("Unique violation: {}", db_err.message());
+                    return AppError::Conflict("Já existe um registro com esses dados".to_string());
+                }
+                "23503" => {
+                    tracing::warn!("Foreign key violation: {}", db_err.message());
+                    return AppError::BadRequest(
+                        "Referência inválida: o registro informado não existe".to_string(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        AppError::Internal(anyhow::anyhow!(err))
     }
 }
 

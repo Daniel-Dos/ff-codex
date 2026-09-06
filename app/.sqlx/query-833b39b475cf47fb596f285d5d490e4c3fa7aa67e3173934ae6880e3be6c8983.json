@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "insert into games (titulo, ano_lancamento) values ($1, $2) returning *",
+  "query": "select * from games where title ilike '%' || $1 || '%'",
   "describe": {
     "columns": [
       {
@@ -10,19 +10,18 @@
       },
       {
         "ordinal": 1,
-        "name": "titulo",
+        "name": "title",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "ano_lancamento",
+        "name": "release_year",
         "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Int4"
+        "Text"
       ]
     },
     "nullable": [
@@ -31,5 +30,5 @@
       false
     ]
   },
-  "hash": "3f00b436b4b6314490342ea4400919776b52d2ada5c738a17928b7c04a96fc73"
+  "hash": "833b39b475cf47fb596f285d5d490e4c3fa7aa67e3173934ae6880e3be6c8983"
 }

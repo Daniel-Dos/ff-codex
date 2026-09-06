@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from games where titulo ilike '%' || $1 || '%'",
+  "query": "select * from games where title ilike '%' || $1 || '%' and release_year = $2",
   "describe": {
     "columns": [
       {
@@ -10,18 +10,19 @@
       },
       {
         "ordinal": 1,
-        "name": "titulo",
+        "name": "title",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "ano_lancamento",
+        "name": "release_year",
         "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Int4"
       ]
     },
     "nullable": [
@@ -30,5 +31,5 @@
       false
     ]
   },
-  "hash": "65ef0823b85f5d7afe2b6d042f1d9732c924607a20e9ff0c843e39c126378868"
+  "hash": "6df3ceee156968762b08e97d547db01f92551f375a6cf75e2dafd2f8a08c0929"
 }
