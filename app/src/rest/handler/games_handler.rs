@@ -32,72 +32,75 @@ pub async fn list_games(
     State(state): State<AppState>,
     Query(params): Query<GamesQuery>,
 ) -> Result<Json<Vec<GamesResponse>>, AppError> {
-    let titulo = params
-        .titulo
+    let title = params
+        .title
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
 
-    let lancamento = params.lancamento;
+    let release_year = params.release_year;
 
-    match (titulo, lancamento) {
-        (Some(t), Some(a)) => games_by_titulo_and_lancamento(state, t, a).await,
-        (Some(t), None) => games_by_titulo(state, t).await,
-        (None, Some(a)) => games_by_lancamento(state, a).await,
+    match (title, release_year) {
+        (Some(t), Some(a)) => games_by_title_and_release_year(state, t, a).await,
+        (Some(t), None) => games_by_title(state, t).await,
+        (None, Some(a)) => games_by_release_year(state, a).await,
         (None, None) => list_all(state).await,
     }
 }
 
 fn map_service_error(e: crate::service::game_service::GameError) -> AppError {
-    AppError::Internal(anyhow::anyhow!(
-        "Erro ao processar operação de games: {}",
-        e
-    ))
+    match e {
+        GameError::Internal(sqlx_err) => AppError::from(sqlx_err),
+        other => AppError::Internal(anyhow::anyhow!(
+            "Erro ao processar operação de games: {}",
+            other
+        )),
+    }
 }
 
-async fn games_by_titulo(
+async fn games_by_title(
     state: AppState,
-    titulo: &str,
+    title: &str,
 ) -> Result<Json<Vec<GamesResponse>>, AppError> {
-    info!("Buscando games com título: {}", titulo);
+    info!("Buscando games com título: {}", title);
 
     let games = state
         .game_service
-        .games_by_titulo(titulo)
+        .games_by_title(title)
         .await
         .map_err(map_service_error)?;
 
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
 }
 
-async fn games_by_lancamento(
+async fn games_by_release_year(
     state: AppState,
-    lancamento: i32,
+    release_year: i32,
 ) -> Result<Json<Vec<GamesResponse>>, AppError> {
-    info!("Buscando games com Ano lancamento: {}", lancamento);
+    info!("Buscando games com Ano lancamento: {}", release_year);
 
     let games = state
         .game_service
-        .games_by_lancamento(lancamento)
+        .games_by_release_year(release_year)
         .await
         .map_err(map_service_error)?;
 
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
 }
 
-async fn games_by_titulo_and_lancamento(
+async fn games_by_title_and_release_year(
     state: AppState,
-    titulo: &str,
-    lancamento: i32,
+    title: &str,
+    release_year: i32,
 ) -> Result<Json<Vec<GamesResponse>>, AppError> {
     info!(
         "Buscando games com o titulo: {} e ano de lançamento: {}",
-        titulo, lancamento
+        title, release_year
     );
 
     let games = state
         .game_service
-        .games_by_titulo_and_lancamento(titulo, lancamento)
+        .games_by_title_and_release_year(title, release_year)
         .await
         .map_err(map_service_error)?;
     Ok(Json(games.into_iter().map(GamesResponse::from).collect()))
@@ -119,20 +122,20 @@ pub async fn create_games(
     State(state): State<AppState>,
     Json(payload): Json<GamesRequest>,
 ) -> Result<(StatusCode, Json<GamesRequest>), AppError> {
-    info!("Cadastrando um novo game: {}", payload.titulo);
+    info!("Cadastrando um novo game: {}", payload.title);
 
     payload.validate()?;
 
     let game_id = state
         .game_service
-        .create_game(&payload.titulo, payload.ano_lancamento)
+        .create_game(&payload.title, payload.release_year)
         .await
         .map(|game| game.id)
         .map_err(map_service_error)?;
 
     info!(
         "O game {} foi cadastrado com sucesso, e o seu id é: {}",
-        payload.titulo, game_id
+        payload.title, game_id
     );
 
     Ok((StatusCode::CREATED, Json(payload)))
