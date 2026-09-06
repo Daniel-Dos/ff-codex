@@ -1,6 +1,8 @@
 use crate::rest::AppError;
 use crate::rest::app_state::AppState;
-use crate::rest::dto::character::{CharactersDetailResponse, CharactersQuery, CharactersRequest, CharactersResponse};
+use crate::rest::dto::character::{
+    CharactersDetailResponse, CharactersQuery, CharactersRequest, CharactersResponse,
+};
 use crate::service::characters_service::CharacterError;
 use axum::Json;
 use axum::extract::{Path, Query, State};
@@ -35,12 +37,15 @@ pub async fn create_characters(
     Ok((StatusCode::CREATED, Json(payload)))
 }
 
-pub async fn character(State(state): State<AppState>, Path(id): Path<i32>) -> Result<Json<CharactersDetailResponse>, AppError> {
+pub async fn character(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<CharactersDetailResponse>, AppError> {
     info!("Buscando personagem com o id: {}", id);
 
     if id <= 0 {
         return Err(AppError::BadRequest(
-            "O id do personagem deve ser maior que zero.".to_string()
+            "O id do personagem deve ser maior que zero.".to_string(),
         ));
     }
 

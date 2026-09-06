@@ -22,8 +22,8 @@ impl CharactersRepository {
             name,
             game_id
         )
-            .fetch_one(&self.pool)
-            .await?;
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(character)
     }
@@ -32,10 +32,13 @@ impl CharactersRepository {
         &self,
         name: &str,
     ) -> Result<Option<Character>, sqlx::Error> {
-        let character =
-            sqlx::query_as!(Character, "select * from characters where name ilike '%' || $1 || '%'", name)
-                .fetch_optional(&self.pool)
-                .await?;
+        let character = sqlx::query_as!(
+            Character,
+            "select * from characters where name ilike '%' || $1 || '%'",
+            name
+        )
+        .fetch_optional(&self.pool)
+        .await?;
 
         Ok(character)
     }
