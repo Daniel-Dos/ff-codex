@@ -11,6 +11,7 @@ pub struct CharactersService {
 #[derive(Error, Debug)]
 pub enum CharacterError {
     #[error("Character not found")]
+    #[allow(dead_code)]
     NotFound,
     #[error("internal database error: {0}")]
     Internal(#[from] sqlx::Error),
