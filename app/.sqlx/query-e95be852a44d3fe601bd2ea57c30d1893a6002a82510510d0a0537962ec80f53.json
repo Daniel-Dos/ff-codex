@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from games where ano_lancamento = $1",
+  "query": "select * from characters",
   "describe": {
     "columns": [
       {
@@ -10,19 +10,17 @@
       },
       {
         "ordinal": 1,
-        "name": "titulo",
-        "type_info": "Varchar"
+        "name": "game_id",
+        "type_info": "Int4"
       },
       {
         "ordinal": 2,
-        "name": "ano_lancamento",
-        "type_info": "Int4"
+        "name": "name",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
-      "Left": [
-        "Int4"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -30,5 +28,5 @@
       false
     ]
   },
-  "hash": "8d591408cbca01c4a3e7e61ad04e359efc7fc704bd640e6eac5027f295873b4f"
+  "hash": "e95be852a44d3fe601bd2ea57c30d1893a6002a82510510d0a0537962ec80f53"
 }

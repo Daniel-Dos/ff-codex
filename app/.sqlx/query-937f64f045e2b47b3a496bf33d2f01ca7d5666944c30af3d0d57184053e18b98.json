@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from games where id = $1",
+  "query": "insert into characters (name, game_id) values ($1, $2) returning *",
   "describe": {
     "columns": [
       {
@@ -10,17 +10,18 @@
       },
       {
         "ordinal": 1,
-        "name": "title",
-        "type_info": "Varchar"
+        "name": "game_id",
+        "type_info": "Int4"
       },
       {
         "ordinal": 2,
-        "name": "release_year",
-        "type_info": "Int4"
+        "name": "name",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
+        "Varchar",
         "Int4"
       ]
     },
@@ -30,5 +31,5 @@
       false
     ]
   },
-  "hash": "9c0eb15c2d9fe8aafc15e5a7bd848a8d3c6a666eacced69dc1c2ef626c1bb6b2"
+  "hash": "937f64f045e2b47b3a496bf33d2f01ca7d5666944c30af3d0d57184053e18b98"
 }

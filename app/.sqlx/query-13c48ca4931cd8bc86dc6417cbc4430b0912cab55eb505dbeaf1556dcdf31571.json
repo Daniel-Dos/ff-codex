@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from games where id = $1",
+  "query": "select * from games where release_year = $1",
   "describe": {
     "columns": [
       {
@@ -30,5 +30,5 @@
       false
     ]
   },
-  "hash": "9c0eb15c2d9fe8aafc15e5a7bd848a8d3c6a666eacced69dc1c2ef626c1bb6b2"
+  "hash": "13c48ca4931cd8bc86dc6417cbc4430b0912cab55eb505dbeaf1556dcdf31571"
 }

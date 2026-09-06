@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select * from games where id = $1",
+  "query": "select * from characters where name ilike '%' || $1 || '%'",
   "describe": {
     "columns": [
       {
@@ -10,18 +10,18 @@
       },
       {
         "ordinal": 1,
-        "name": "title",
-        "type_info": "Varchar"
+        "name": "game_id",
+        "type_info": "Int4"
       },
       {
         "ordinal": 2,
-        "name": "release_year",
-        "type_info": "Int4"
+        "name": "name",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "Int4"
+        "Text"
       ]
     },
     "nullable": [
@@ -30,5 +30,5 @@
       false
     ]
   },
-  "hash": "9c0eb15c2d9fe8aafc15e5a7bd848a8d3c6a666eacced69dc1c2ef626c1bb6b2"
+  "hash": "611334199d0c573db1f9f8715c67bbdb6a91950cac243219534d259b9a369d90"
 }
