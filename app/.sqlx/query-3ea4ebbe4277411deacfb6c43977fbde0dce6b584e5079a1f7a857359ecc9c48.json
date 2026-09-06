@@ -10,12 +10,12 @@
       },
       {
         "ordinal": 1,
-        "name": "titulo",
+        "name": "title",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "ano_lancamento",
+        "name": "release_year",
         "type_info": "Int4"
       }
     ],
