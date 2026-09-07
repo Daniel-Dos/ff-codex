@@ -6,5 +6,5 @@ pub mod routes;
 pub mod server_app;
 
 pub use error::AppError;
-pub use routes::routes::router;
+pub use routes::router::router;
 pub use server_app::server;
