@@ -5,6 +5,8 @@ mod service;
 mod util;
 
 use crate::rest::{router, server};
+use axum::Router;
+use axum::routing::get;
 use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
 

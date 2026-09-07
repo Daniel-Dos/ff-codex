@@ -6,7 +6,3 @@ pub async fn health() -> (StatusCode, Json<Value>) {
     let body = json!({"status": "up"});
     (StatusCode::OK, Json(body))
 }
-
-pub async fn ready() -> StatusCode {
-    StatusCode::OK
-}
