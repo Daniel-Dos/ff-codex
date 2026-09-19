@@ -1,0 +1,10 @@
+INSERT INTO characters(game_id, name) values (7, 'Cloud Strife');
+INSERT INTO characters(game_id, name) values (7, 'Tifa Lockhart');
+INSERT INTO characters(game_id, name) values (7, 'Barret Wallace');
+INSERT INTO characters(game_id, name) values (7, 'Aerith Gainsborough');
+INSERT INTO characters(game_id, name) values (7, 'Red XIII (Nanaki)');
+INSERT INTO characters(game_id, name) values (7, 'Yuffie Kisaragi');
+INSERT INTO characters(game_id, name) values (7, 'Cait Sith');
+INSERT INTO characters(game_id, name) values (7, 'Vincent Valentine');
+INSERT INTO characters(game_id, name) values (7, 'Cid Highwind');
+INSERT INTO characters(game_id, name) values (7, 'Sephiroth');
