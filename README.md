@@ -6,40 +6,20 @@ O objetivo não é construir um produto completo, mas sim praticar conceitos fun
 
 ## Stack
 
-| Tecnologia | Papel | Status |
-|------------|-------|--------|
-| [Rust](https://www.rust-lang.org/) | Linguagem principal | Implementado (edition 2024) |
-| [Axum](https://github.com/tokio-rs/axum) | Framework web (HTTP) | Implementado (rotas `/health`, `/ready` e CRUD `/ff-codex/games`) |
-| [SQLx](https://github.com/launchbadge/sqlx) | Acesso a banco de dados | Implementado (leitura e escrita via `PgPool`) |
-| [PostgreSQL](https://www.postgresql.org/) | Banco relacional | Efêmero via Docker Compose |
-| [tracing](https://github.com/tokio-rs/tracing) | Observabilidade (logs estruturados JSON) | Implementado |
-| [validator](https://github.com/Keats/validator) | Validação de payload de entrada | Implementado no `POST` |
+| Tecnologia | Papel |
+|------------|-------|
+| [Rust](https://www.rust-lang.org/) — edition 2024 | Linguagem principal |
+| [Axum](https://github.com/tokio-rs/axum) 0.8 | Framework web (HTTP) |
+| [Tokio](https://tokio.rs/) | Runtime assíncrono e graceful shutdown |
+| [SQLx](https://github.com/launchbadge/sqlx) 0.8 | Acesso a banco de dados (PostgreSQL) com cache offline em `.sqlx/` |
+| [PostgreSQL](https://www.postgresql.org/) 18 | Banco relacional, efêmero via Docker Compose |
+| [Serde](https://serde.rs/) | Serialização e desserialização JSON |
+| [validator](https://github.com/Keats/validator) 0.21 | Validação de payload de entrada |
+| [thiserror](https://github.com/dtolnay/thiserror) | Erros de domínio tipados |
+| [tracing](https://github.com/tokio-rs/tracing) | Observabilidade (logs estruturados em JSON) |
+| [dotenvy](https://github.com/dotenv-rs/dotenvy) | Carregamento das variáveis do `.env` |
 
-> **Atenção:** o SQLx está integrado ao fluxo de leitura e escrita: `GET /ff-codex/games` consulta a tabela `games` via `State` + `GameService` (`GameRepository`), com filtros opcionais `?titulo=...` (busca parcial case-insensitive via `ILIKE`) e `?lancamento=...` (igualdade); `POST /ff-codex/games` persiste o cadastro no banco via `INSERT ... RETURNING *`; `GET /ff-codex/games/{id}` busca por id; `DELETE /ff-codex/games/{id}` remove por id.
-
-## Status
-
-O projeto está em **estágio de CRUD funcional para a entidade `games`**:
-
-- `Cargo.toml` configurado com `edition = "2024"` e package `ff-codex`.
-- Servidor HTTP com Axum 0.8 em `src/rest/` — rotas `/health`, `/ready` e CRUD `/ff-codex/games`.
-- Logs estruturados em JSON via `tracing`/`tracing-subscriber`.
-- Banco de dados PostgreSQL configurado via `docker-compose.yml` (container efêmero, exposto na porta 5432 do host).
-- Migrações SQLx em `app/migrations/` (`001_create_table_game.sql`, `002_insert_game.sql` e `003_create_table_caracters.sql`).
-- SQLx integrado: `.env` via `dotenvy`, `PgPool` (feature `postgres`) criado no `main.rs` e exposto via `State` (`GameService` → `GameRepository`).
-- **Implementado:**
-  - `GET /ff-codex/games` — lista do banco com filtros opcionais `titulo` (parcial, `ILIKE`) e `lancamento` (igualdade); sem filtros → lista completa; sem match → `200 []`.
-   - `POST /ff-codex/games` — persiste o cadastro no banco (`INSERT ... RETURNING *`); payload validado por `validator` (`titulo` não vazio, `ano_lancamento > 0`); erros de validação retornam JSON estruturado com detalhes por campo; responde `201` ecoando o payload.
-  - `GET /ff-codex/games/{id}` — busca um jogo por id; valida `id > 0` (`400`) e responde `404` quando não encontrado.
-  - `DELETE /ff-codex/games/{id}` — remove um jogo por id; responde `404` quando não encontrado.
-- Camadas separadas:
-  - `domain/` — `Game` com `#[derive(FromRow, Debug)]`, campos `pub` (`id`, `titulo`, `ano_lancamento`).
-  - `repository/` — `GameRepository { pool: PgPool }` com `all_games`, `games_by_titulo`, `games_by_lancamento`, `games_by_titulo_and_lancamento`, `games_by_id`, `create_game`, `delete_game`.
-  - `service/` — `GameService` com `GameError` (`thiserror`: `NotFound`, `Internal(#[from] sqlx::Error)`); retorna **domínio**, nunca DTO.
-   - `rest/` — `AppState` (`#[derive(Clone)]`), DTOs (`GamesRequest`, `GamesQuery`, `GamesResponse`, `GameDetailResponse`) com `impl From<Game>` para as respostas, `AppError` centralizado com `IntoResponse` (`NotFound`, `BadRequest`, `Validation`, `Internal`), `validator` aplicado no handler do `POST`.
-- Erros centralizados em `src/rest/error.rs`: `AppError` mapeia para status HTTP (`404`, `400`, `500`) com dois formatos de JSON: erros gerais usam `{"error":"...","code":<status>}`; erros de validação usam `{"erro":"validacao_falhou","campos":[{"campo":"...","codigo":"...","mensagem":"..."}]}`. `Internal` é logado via `tracing::error!`.
-
-As próximas etapas completam o CRUD de `games` (PUT) e abrem espaço para as entidades temáticas do universo *Final Fantasy*.
+> **Nomenclatura:** o código, o schema e os contratos da API usam inglês (`title`, `release_year`, `name`, tabela `characters`), enquanto as mensagens de validação e os logs permanecem em português.
 
 ## Arquitetura
 
@@ -49,9 +29,9 @@ A API segue uma arquitetura em camadas com separação clara de responsabilidade
 
 ```mermaid
 graph TD
-    main["main.rs"] -->|"cria PgPool"| Repo["GameRepository"]
-    main -->|"injeta Repository"| Service["GameService"]
-    main -->|"injeta Service"| State["AppState"]
+    main["main.rs"] -->|"cria PgPool"| Repo["GameRepository\nCharactersRepository"]
+    main -->|"injeta Repositories"| Service["GameService\nCharactersService"]
+    main -->|"injeta Services"| State["AppState"]
     main -->|"monta router"| Router["Router"]
 
     Router -->|"with_state(state)"| Handler["Handlers"]
@@ -73,12 +53,23 @@ graph TD
 | Camada | Responsabilidade | Arquivo(s) |
 |--------|-----------------|------------|
 | `main.rs` | Bootstrap: dotenv, tracing, PgPool, injeção | `src/main.rs` |
-| `AppState` | Container de dependências (cloneável) | `src/rest/app_state.rs` |
-| `Router` | Roteamento HTTP + extração de `State` | `src/rest/routers.rs` |
-| `Handlers` | Traduz HTTP → domínio (DTO, status, AppError) | `src/rest/handler/` |
-| `Service` | Regras de negócio, validação, orquestração | `src/service/game_service.rs` |
-| `Repository` | SQL/persistência via SQLx | `src/repository/game.rs` |
-| `Domain` | Structs de domínio (`Game`) | `src/domain/game.rs` |
+| `AppState` | Container de dependências (cloneável) com os dois services | `src/rest/app_state.rs` |
+| `Router` | Roteamento HTTP, prefixo `/ff-codex/api/v1` e extração de `State` | `src/rest/routes/` |
+| `Handlers` | Traduz HTTP → domínio (DTO, status, `AppError`) | `src/rest/handler/` |
+| `Service` | Regras de negócio e orquestração; retorna **domínio**, nunca DTO | `src/service/` |
+| `Repository` | SQL e persistência via SQLx | `src/repository/` |
+| `Domain` | Structs de domínio (`Game`, `Character`, `CharactersGames`) | `src/domain/` |
+
+### Métodos por camada
+
+| Camada | Métodos |
+|--------|---------|
+| `GameRepository` | `all_games`, `games_by_title`, `games_by_release_year`, `games_by_title_and_release_year`, `games_by_id`, `create_game`, `delete_game` |
+| `CharactersRepository` | `all_characters`, `characters_by_id`, `find_character_by_name`, `all_characters_by_id_game`, `create_character` |
+| `GameService` | `all_games`, `games_by_title`, `games_by_release_year`, `games_by_title_and_release_year`, `game_by_id`, `create_game`, `delete_game_by_id` |
+| `CharactersService` | `all_characters`, `character_by_id`, `find_character_by_name`, `all_characters_by_game_id`, `create_character` |
+
+Erros de domínio: `GameError` (`NotFound`, `Internal(#[from] sqlx::Error)`) e `CharacterError` (`NotFound`, `Internal(#[from] sqlx::Error)`), ambos via `thiserror`.
 
 ### Módulos
 
@@ -87,54 +78,83 @@ Estrutura de módulos do código-fonte em `app/src/`:
 ```mermaid
 graph LR
     subgraph rest["rest/"]
+        routes["routes/"]
+        router["router.rs"]
+        routes_games["games.rs"]
+        routes_chars["characters.rs"]
         handler["handler/"]
         handler_health["health.rs"]
         handler_games["games_handler.rs"]
+        handler_chars["characters_handler.rs"]
         dto["dto/"]
         dto_game["game.rs"]
+        dto_char["character.rs"]
         error["error.rs"]
         app_state["app_state.rs"]
-        routers["routers.rs"]
         server["server_app.rs"]
     end
 
     subgraph domain["domain/"]
         game_d["game.rs"]
+        char_d["character.rs"]
+        cg_d["characters_games.rs"]
     end
 
     subgraph repository["repository/"]
         game_r["game.rs"]
+        char_r["character.rs"]
     end
 
     subgraph service["service/"]
         game_s["game_service.rs"]
+        char_s["characters_service.rs"]
+    end
+
+    subgraph util["util/"]
+        banner["banner.rs"]
     end
 
     main["main.rs"] --> app_state
-    main --> routers
+    main --> routes
     main --> game_r
+    main --> char_r
     main --> game_s
+    main --> char_s
+    main --> banner
     app_state --> game_s
-    routers --> handler
+    app_state --> char_s
+    routes --> router
+    router --> routes_games
+    router --> routes_chars
+    routes_games --> handler
+    routes_chars --> handler
     handler --> handler_health
     handler --> handler_games
+    handler --> handler_chars
     handler --> dto
     dto --> dto_game
+    dto --> dto_char
     handler --> error
     game_s --> game_r
+    char_s --> char_r
     game_r --> game_d
+    char_r --> char_d
     game_s --> game_d
+    char_s --> char_d
+    char_s --> cg_d
+    char_r --> cg_d
 
     style main fill:#4a90d9,color:#fff
     style rest fill:#f5a623,color:#000
     style domain fill:#bd10e0,color:#fff
     style repository fill:#50e3c2,color:#000
     style service fill:#7ed321,color:#000
+    style util fill:#95a5a6,color:#000
 ```
 
 ## Fluxo de Requisições
 
-### GET /ff-codex/games
+### GET /ff-codex/api/v1/games
 
 Fluxo completo de uma requisição de listagem (com ou sem filtros):
 
@@ -147,22 +167,22 @@ sequenceDiagram
     participant RE as Repository
     participant DB as PostgreSQL
 
-    C->>R: GET /ff-codex/games?titulo=vii&lancamento=1997
-    R->>H: list_games(Query { titulo, lancamento })
-    H->>H: Extrai e valida query params
+    C->>R: GET /ff-codex/api/v1/games?title=vii&release_year=1997
+    R->>H: list_games(Query { title, release_year })
+    H->>H: Extrai query params (ignora strings vazias)
 
-    alt titulo E lancamento
-        H->>S: games_by_titulo_and_lancamento(titulo, lancamento)
-        S->>RE: games_by_titulo_and_lancamento(titulo, lancamento)
-        RE->>DB: SELECT * FROM games WHERE titulo ILIKE ... AND ano_lancamento = ...
-    else titulo apenas
-        H->>S: games_by_titulo(titulo)
-        S->>RE: games_by_titulo(titulo)
-        RE->>DB: SELECT * FROM games WHERE titulo ILIKE ...
-    else lancamento apenas
-        H->>S: games_by_lancamento(lancamento)
-        S->>RE: games_by_lancamento(lancamento)
-        RE->>DB: SELECT * FROM games WHERE ano_lancamento = ...
+    alt title E release_year
+        H->>S: games_by_title_and_release_year(title, release_year)
+        S->>RE: games_by_title_and_release_year(title, release_year)
+        RE->>DB: SELECT * FROM games WHERE title ILIKE ... AND release_year = ...
+    else title apenas
+        H->>S: games_by_title(title)
+        S->>RE: games_by_title(title)
+        RE->>DB: SELECT * FROM games WHERE title ILIKE ...
+    else release_year apenas
+        H->>S: games_by_release_year(release_year)
+        S->>RE: games_by_release_year(release_year)
+        RE->>DB: SELECT * FROM games WHERE release_year = ...
     else sem filtros
         H->>S: all_games()
         S->>RE: all_games()
@@ -176,7 +196,7 @@ sequenceDiagram
     H-->>C: 200 [GamesResponse]
 ```
 
-### POST /ff-codex/games
+### POST /ff-codex/api/v1/games
 
 Fluxo de criação com validação e persistência:
 
@@ -190,28 +210,28 @@ sequenceDiagram
     participant RE as Repository
     participant DB as PostgreSQL
 
-    C->>R: POST /ff-codex/games (JSON body)
+    C->>R: POST /ff-codex/api/v1/games (JSON body)
     R->>H: create_games(Json<GamesRequest>)
     H->>V: payload.validate()
     alt dados inválidos
-        V-->>H: ValidationError
-        H-->>C: 400 {"erro":"validacao_falhou","campos":[{"campo":"titulo","codigo":"titulo_vazio","mensagem":"..."}]}
+        V-->>H: ValidationErrors
+        H-->>C: 400 {"erro":"validacao_falhou","campos":[...]}
     else dados válidos
         V-->>H: OK
-        H->>S: create_game(titulo, ano_lancamento)
-        S->>RE: create_game(titulo, lancamento)
+        H->>S: create_game(title, release_year)
+        S->>RE: create_game(title, release_year)
         RE->>DB: INSERT INTO games ... RETURNING *
-        DB-->>RE: Game { id, titulo, ano_lancamento }
+        DB-->>RE: Game { id, title, release_year }
         RE-->>S: Game
         S-->>H: Game
-        H->>H: Log game_id gerado
-        H-->>C: 201 {"titulo":"...","ano_lancamento":...}
+        H->>H: Log do game_id gerado
+        H-->>C: 201 {"title":"...","release_year":...}
     end
 ```
 
-### DELETE /ff-codex/games/{id}
+### DELETE /ff-codex/api/v1/games/{id}
 
-Fluxo de remoção com tratamento de não encontrado:
+Fluxo de remoção com tratamento de não encontrado e violação de FK:
 
 ```mermaid
 sequenceDiagram
@@ -222,7 +242,7 @@ sequenceDiagram
     participant RE as Repository
     participant DB as PostgreSQL
 
-    C->>R: DELETE /ff-codex/games/{id}
+    C->>R: DELETE /ff-codex/api/v1/games/{id}
     R->>H: delete_game(Path(id))
     H->>S: delete_game_by_id(id)
     S->>RE: delete_game(id)
@@ -232,51 +252,40 @@ sequenceDiagram
     alt rows_affected == 0
         S-->>H: GameError::NotFound
         H-->>C: 404 {"error":"Game com id N não encontrado para deleção","code":404}
+    else characters vinculados (SQLSTATE 23503)
+        S-->>H: GameError::Internal(sqlx::Error)
+        H-->>C: 400 {"error":"Referência inválida: ...","code":400}
     else rows_affected > 0
         S-->>H: Ok(())
         H-->>C: 200 "Game com id N deletado com sucesso!"
     end
 ```
 
-## Roadmap
+### GET /ff-codex/api/v1/games/{game_id}/characters
 
-Etapas planejadas para o aprendizado, em ordem sugerida:
+Fluxo da listagem de personagens vinculados a um jogo:
 
-1. **Servidor HTTP com Axum** ✅
-   - Endpoint `GET /health` que retorna o status da API. ✅
-   - Endpoint `GET /ready` (prontidão do serviço). ✅
-   - Endpoint `GET/POST /ff-codex/games` (lista do banco com filtros; cadastro com persistência). ✅
-   - Endpoint `GET/DELETE /ff-codex/games/{id}` (busca e remoção por id). ✅
-   - Entender rotas, handlers, `State`, extração de parâmetros (`Path`, `Query`, `Json`) e `IntoResponse`. ✅
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant R as Router
+    participant H as Handler
+    participant S as Service
+    participant RE as Repository
+    participant DB as PostgreSQL
 
-2. **Modelagem de dados** 🔄
-   - Definir entidades do universo *Final Fantasy* (ex.: criaturas, personagens, itens). 🔄
-   - Introduzir tipos e estruturas em Rust (DTOs `GamesRequest`/`GamesQuery`/`GamesResponse`/`GameDetailResponse` já criados). 🔄
-   - Tabela `caracters` já existe (migração `003_create_table_caracters.sql`) aguardando camada Rust. 🔄
-
-3. **Persistência com SQLx** ✅
-   - Conectar ao PostgreSQL via Docker Compose (pool de conexões). ✅
-   - Executar migrações e consultas reais no código (`GameRepository` cobrindo listagem, filtros, busca por id, inserção e remoção). ✅
-   - Injeção via `State` (`GameService` + `AppState`). ✅
-   - Filtrar a lista por título e/ou ano de lançamento via query params. ✅
-
-4. **CRUD da API** 🔄
-   - Criação, leitura, atualização e exclusão para `games`. 🔄
-     - `POST /ff-codex/games` ✅
-     - `GET /ff-codex/games` ✅
-     - `GET /ff-codex/games/{id}` ✅
-     - `DELETE /ff-codex/games/{id}` ✅
-     - `PUT /ff-codex/games/{id}` (atualização) — pendente.
-   - Praticar serialização com `serde` e validação com `validator`. ✅
-
-5. **Funcionalidades temáticas (ideias)**
-   - **Personagens**: camada Rust para a tabela `caracters` (CRUD + vínculo com `games` via `game_id`).
-   - **Bestiário**: listar e consultar criaturas com atributos (HP, MP, fraquezas).
-   - **Jobs**: catálogo de classes com habilidades.
-   - **Itens**: inventário de itens consumíveis e equipamentos.
-   - **Busca e filtros**: consultas por nome, tipo ou atributo em todas as entidades.
-
-> As funcionalidades temáticas são ideias para guiar o aprendizado e podem mudar conforme o progresso.
+    C->>R: GET /ff-codex/api/v1/games/{game_id}/characters
+    R->>H: characters_games(Path(game_id))
+    H->>H: Valida game_id > 0
+    H->>S: all_characters_by_game_id(game_id)
+    S->>RE: all_characters_by_id_game(game_id)
+    RE->>DB: SELECT c.id, c.name, g.title, g.release_year FROM characters c INNER JOIN games g ON c.game_id = g.id WHERE g.id = $1
+    DB-->>RE: rows (vazio se o game não existir)
+    RE-->>S: Vec<CharactersGames>
+    S-->>H: Vec<CharactersGames>
+    H->>H: map(CharactersGamesDetailResponse::from)
+    H-->>C: 200 [CharactersGamesDetailResponse]
+```
 
 ## Como executar
 
@@ -285,11 +294,6 @@ Etapas planejadas para o aprendizado, em ordem sugerida:
 - [Rust](https://www.rust-lang.org/tools/install) instalado (toolchain com suporte à `edition 2024`).
 - `cargo` disponível no `PATH`.
 - [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/) instalados.
-- `sqlx-cli` instalado para executar as migrações:
-
-  ```bash
-  cargo install sqlx-cli --no-default-features --features native-tls,postgres
-  ```
 
 ### Passos
 
@@ -298,71 +302,138 @@ Todos os comandos abaixo são executados a partir da pasta `app/`:
 ```bash
 cd app
 
-# 1. Subir o banco de dados (PostgreSQL via Docker Compose)
+# 1. Subir o banco, rodar as migrações e regenerar o cache .sqlx
+#    (o compose já executa os serviços `migrate` e `prepare`)
 docker compose up -d
 
-# 2. Executar as migrações (usa o DATABASE_URL definido no .env)
-sqlx migrate run
-
-# 3. Compilar o projeto
+# 2. Compilar o projeto
 cargo build
 
-# 4. Executar o binário
+# 3. Executar o binário
 cargo run
+```
+
+Para instalar o `sqlx-cli` caso seja necessário rodar as migrações manualmente:
+
+```bash
+cargo install sqlx-cli --no-default-features --features postgres
+sqlx migrate run    # usa o DATABASE_URL definido no .env
 ```
 
 Notas:
 
-- O banco é **efêmero**: o `docker-compose.yml` não define volume persistente, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
+- O `docker-compose.yml` define três serviços: `postgres` (banco), `migrate` (aplica as migrações assim que o healthcheck passa) e `prepare` (gera o cache `.sqlx/`). O passo `sqlx migrate run` manual é redundante quando o compose sobe normalmente.
+- O cache em `.sqlx/` (12 queries) é o que permite `cargo check`/`cargo build` em modo offline (`SQLX_OFFLINE=true`, já configurado no Dockerfile e no CI). Se as queries mudarem, regenere com `cargo sqlx prepare`.
+- O banco é **efêmero**: o serviço `postgres` não monta o volume `postgres_data` declarado no compose, então os dados são perdidos ao recriar o container (`docker compose down` seguido de `docker compose up -d`).
 - O `DATABASE_URL` do `.env` aponta para `localhost:5432` (mesma porta mapeada pelo `docker-compose.yml`).
 - **`cargo run` exige o banco de pé:** o `main.rs` conecta ao PostgreSQL no startup. Se o banco estiver parado ou o `DATABASE_URL` não estiver definido no `.env`, o programa loga o erro e encerra antes de subir o servidor.
 - Para parar o banco: `docker compose down`.
 
-A saída esperada ao executar `cargo run` é uma sequência de logs estruturados em JSON, por exemplo:
+Variáveis de ambiente reconhecidas:
+
+| Variável | Default | Obrigatória |
+|----------|---------|-------------|
+| `DATABASE_URL` | — | Sim (erro fatal no startup se ausente) |
+| `RUST_LOG` | `warn,ff_codex=trace` | Não |
+| `HOST` | `0.0.0.0` | Não |
+| `PORT` | `8080` | Não |
+
+> O alvo do `EnvFilter` em `main.rs` é `ff_codex` (com underscore), porque o Cargo converte o nome do pacote `ff-codex` (com hífen) para o nome do binário. Escrever `ff-codex` faz o filtro não casar e os logs do crate somem.
+
+A saída esperada ao executar `cargo run` é o banner `CODEx` seguido de uma sequência de logs estruturados em JSON, por exemplo:
 
 ```json
 {"timestamp":"...","level":"INFO","fields":{"message":"Iniciando a api de Final Fantasy."},"target":"ff_codex"}
 {"timestamp":"...","level":"INFO","fields":{"message":"Server starting on http://0.0.0.0:8080"},"target":"ff_codex::rest::server_app"}
 ```
 
-O servidor escuta por padrão em `0.0.0.0:8080` (configurável via variáveis de ambiente `HOST` e `PORT`, lidas em `src/rest/server_app.rs`) e responde a **graceful shutdown** em `Ctrl+C`/`SIGTERM`.
+O servidor escuta por padrão em `0.0.0.0:8080` e responde a **graceful shutdown** em `Ctrl+C`/`SIGTERM` (log `Desligamento gracioso concluído. Servidor encerrado.`).
 
 Para testar a API com o servidor de pé:
 
 ```bash
 curl http://localhost:8080/health
-curl http://localhost:8080/ready
-curl http://localhost:8080/ff-codex/games
-curl "http://localhost:8080/ff-codex/games?titulo=vii"
-curl "http://localhost:8080/ff-codex/games?lancamento=1997"
-curl "http://localhost:8080/ff-codex/games?titulo=final&lancamento=1997"
-curl http://localhost:8080/ff-codex/games/1
-curl -X DELETE http://localhost:8080/ff-codex/games/1
+curl http://localhost:8080/ff-codex/api/v1/games
+curl "http://localhost:8080/ff-codex/api/v1/games?title=vii"
+curl "http://localhost:8080/ff-codex/api/v1/games?release_year=1997"
+curl "http://localhost:8080/ff-codex/api/v1/games?title=final&release_year=1997"
+curl http://localhost:8080/ff-codex/api/v1/games/1
+curl -X DELETE http://localhost:8080/ff-codex/api/v1/games/1
+curl http://localhost:8080/ff-codex/api/v1/characters
+curl "http://localhost:8080/ff-codex/api/v1/characters?name=cloud"
+curl http://localhost:8080/ff-codex/api/v1/characters/1
+curl http://localhost:8080/ff-codex/api/v1/games/1/characters
 ```
 
 ## Endpoints
 
+`GET /health` fica na raiz; todas as rotas de API são agrupadas sob o prefixo `/ff-codex/api/v1`.
+
 | Método | Rota | Descrição | Sucesso | Erros |
 |--------|------|-----------|---------|-------|
 | GET | `/health` | Verificação de saúde da API | `200` `{"status":"up"}` | — |
-| GET | `/ready` | Prontidão do serviço | `200` (sem corpo) | — |
-| GET | `/ff-codex/games` | Lista de jogos; filtros opcionais `?titulo=` (ILIKE) e `?lancamento=` (igualdade) | `200` `[{"titulo":"...","ano_lancamento":...}]` | `500` Erro interno |
-| POST | `/ff-codex/games` | Cadastra um jogo; payload validado (`titulo` não vazio, `ano_lancamento > 0`) | `201` `{"titulo":"...","ano_lancamento":...}` | `400` Validação estruturada, `500` Erro interno |
-| GET | `/ff-codex/games/{id}` | Busca um jogo por id | `200` `{"id":...,"titulo":"...","ano_lancamento":...}` | `400` Id inválido, `404` Não encontrado, `500` Erro interno |
-| DELETE | `/ff-codex/games/{id}` | Remove um jogo por id | `200` `"Game com id N deletado com sucesso!"` | `404` Não encontrado, `500` Erro interno |
+| GET | `/ff-codex/api/v1/games` | Lista de jogos; filtros opcionais `?title=` (ILIKE parcial) e `?release_year=` (igualdade) | `200` `[{"title":"...","release_year":...}]` | `500` Erro interno |
+| POST | `/ff-codex/api/v1/games` | Cadastra um jogo; payload validado | `201` `{"title":"...","release_year":...}` | `400` Validação estruturada, `500` Erro interno |
+| GET | `/ff-codex/api/v1/games/{id}` | Busca um jogo por id | `200` `{"id":...,"title":"...","release_year":...}` | `400` Id inválido, `404` Não encontrado |
+| DELETE | `/ff-codex/api/v1/games/{id}` | Remove um jogo por id | `200` `"Game com id N deletado com sucesso!"` | `400` FK violada, `404` Não encontrado, `500` Erro interno |
+| GET | `/ff-codex/api/v1/characters` | Lista personagens; filtro opcional `?name=` (ILIKE parcial) | `200` `[{"name":"..."}]` | `500` Erro interno |
+| GET | `/ff-codex/api/v1/characters/{id}` | Busca um personagem por id | `200` `{"id":...,"name":"...","game_id":...}` | `400` Id inválido, `404` Não encontrado |
+| POST | `/ff-codex/api/v1/games/{game_id}/characters` | Cadastra um personagem vinculado a um jogo | `201` `{"name":"..."}` | `400` Validação estruturada, `409` Já existe, `500` Erro interno |
+| GET | `/ff-codex/api/v1/games/{game_id}/characters` | Lista os personagens de um jogo (JOIN com `games`) | `200` `[{"id":...,"name":"...","title":"...","release_year":...}]` | `400` Id inválido, `500` Erro interno |
 
-> Erros de validação (POST) retornam formato estruturado: `{"erro":"validacao_falhou","campos":[{"campo":"...","codigo":"...","mensagem":"..."}]}`. Demais erros usam: `{"error":"...","code":<status>}`.
+### Comportamentos observáveis
 
-### POST /ff-codex/games
+- **Filtro vazio é ignorado.** Os handlers aplicam `trim` e descartam strings vazias antes de filtrar; `?title=` (sem valor) equivale a não enviar filtro e retorna a lista completa. O mesmo vale para `?name=`.
+- **`GET /characters?name=X` retorna no máximo um item.** `find_character_by_name` usa `fetch_optional`, então o filtro devolve 0 ou 1 registro, nunca uma lista.
+- **`GET /games/{game_id}/characters` nunca retorna 404.** Um `game_id` inexistente resulta em `200 []`.
+- **`GET /games/{id}` e `GET /characters/{id}` nunca retornam 500.** O handler converte qualquer erro em `NotFound`, inclusive falhas reais de banco.
+- **Payload com campos em português é rejeitado.** Os DTOs esperam `title`/`release_year`; enviar `titulo`/`ano_lancamento` falha na desserialização e o Axum responde `422` com corpo em texto puro, não com o JSON de validação.
 
-Cadastra um novo jogo na tabela `games` (INSERT com `RETURNING *`). O `id` é gerado pelo banco (`GENERATED ALWAYS AS IDENTITY`) e usado apenas no log — a resposta ecoa o payload enviado. A validação de entrada é feita com `validator` (`#[derive(Validate)]` em `GamesRequest`).
+### Formatos de erro
+
+Erros gerais usam chaves em inglês; erros de validação usam chaves em português:
+
+```json
+{ "error": "Game com id 999 não encontrado", "code": 404 }
+```
+
+```json
+{
+  "erro": "validacao_falhou",
+  "campos": [
+    { "campo": "title", "codigo": "titulo_vazio", "mensagem": "O título do jogo não pode ser vazio" }
+  ]
+}
+```
+
+`AppError` (`src/rest/error.rs`) centraliza as respostas via `IntoResponse`:
+
+| Variante | Status | Corpo |
+|----------|--------|-------|
+| `NotFound(String)` | `404` | `{"error":"<msg>","code":404}` |
+| `BadRequest(String)` | `400` | `{"error":"<msg>","code":400}` |
+| `Validation(ValidationErrorResponse)` | `400` | `{"erro":"validacao_falhou","campos":[...]}` |
+| `Conflict(String)` | `409` | `{"error":"<msg>","code":409}` |
+| `Internal(anyhow::Error)` | `500` | `{"error":"Erro interno do servidor","code":500}` |
+
+A variante `Internal` nunca expõe o erro original ao cliente — o detalhe vai apenas para o log via `tracing::error!`. Já `Conflict` e `BadRequest` por violação de restrição são gerados automaticamente pela conversão de `sqlx::Error`, que mapeia o SQLSTATE:
+
+| SQLSTATE | Resultado | Mensagem fixa |
+|----------|------------|---------------|
+| `23505` (unique violation) | `409 Conflict` | `Já existe um registro com esses dados` |
+| `23503` (foreign key violation) | `400 BadRequest` | `Referência inválida: o registro informado não existe` |
+| demais | `500 Internal` | — |
+
+### POST /ff-codex/api/v1/games
+
+Cadastra um novo jogo na tabela `games` (`INSERT ... RETURNING *`). O `id` é gerado pelo banco (`GENERATED ALWAYS AS IDENTITY`) e usado apenas no log — a resposta ecoa o payload enviado. A validação de entrada é feita com `validator` (`#[derive(Validate)]` em `GamesRequest`).
 
 **Request Body** (campos obrigatórios, validados):
 
 ```json
 {
-  "titulo": "Final Fantasy Tactics",
-  "ano_lancamento": 1997
+  "title": "Final Fantasy Tactics",
+  "release_year": 1997
 }
 ```
 
@@ -370,20 +441,20 @@ Cadastra um novo jogo na tabela `games` (INSERT com `RETURNING *`). O `id` é ge
 
 ```json
 {
-  "titulo": "Final Fantasy Tactics",
-  "ano_lancamento": 1997
+  "title": "Final Fantasy Tactics",
+  "release_year": 1997
 }
 ```
 
 **Erros:**
 
-- `400 Bad Request` — payload inválido (`titulo` vazio ou `ano_lancamento <= 0`). Retorna JSON estruturado com detalhes por campo:
+- `400 Bad Request` — payload inválido (`title` vazio ou `release_year <= 0`). Retorna JSON estruturado com detalhes por campo:
   ```json
   {
     "erro": "validacao_falhou",
     "campos": [
-      { "campo": "titulo", "codigo": "titulo_vazio", "mensagem": "O título do jogo não pode ser vazio" },
-      { "campo": "ano_lancamento", "codigo": "ano_invalido", "mensagem": "O ano de lançamento do jogo deve ser maior que 0" }
+      { "campo": "title", "codigo": "titulo_vazio", "mensagem": "O título do jogo não pode ser vazio" },
+      { "campo": "release_year", "codigo": "ano_invalido", "mensagem": "O ano de lançamento do jogo deve ser maior que 0" }
     ]
   }
   ```
@@ -394,20 +465,20 @@ Cadastra um novo jogo na tabela `games` (INSERT com `RETURNING *`). O `id` é ge
 Sucesso:
 
 ```bash
-curl -X POST http://localhost:8080/ff-codex/games \
+curl -X POST http://localhost:8080/ff-codex/api/v1/games \
   -H "Content-Type: application/json" \
-  -d '{"titulo":"Final Fantasy Tactics","ano_lancamento":1997}'
+  -d '{"title":"Final Fantasy Tactics","release_year":1997}'
 ```
 
 Validação falhou:
 
 ```bash
-curl -X POST http://localhost:8080/ff-codex/games \
+curl -X POST http://localhost:8080/ff-codex/api/v1/games \
   -H "Content-Type: application/json" \
-  -d '{"titulo":"","ano_lancamento":0}'
+  -d '{"title":"","release_year":0}'
 ```
 
-### GET /ff-codex/games/{id}
+### GET /ff-codex/api/v1/games/{id}
 
 Busca um jogo pelo `id` no banco.
 
@@ -416,38 +487,25 @@ Busca um jogo pelo `id` no banco.
 ```json
 {
   "id": 1,
-  "titulo": "Final Fantasy VII",
-  "ano_lancamento": 1997
+  "title": "Final Fantasy VII",
+  "release_year": 1997
 }
 ```
 
 **Erros:**
 
 - `400 Bad Request` — `id <= 0`. Corpo: `{"error":"O id do game não pode ser vazio ou menor que 1","code":400}`.
-- `404 Not Found` — jogo não encontrado. Corpo: `{"error":"Game com id N não encontrado","code":404}`.
-- `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+- `404 Not Found` — jogo não encontrado (também retornado em caso de falha no banco, por conversão do handler). Corpo: `{"error":"Game com id N não encontrado","code":404}`.
 
 **Exemplos com `curl`:**
 
-Sucesso:
-
 ```bash
-curl http://localhost:8080/ff-codex/games/1
+curl http://localhost:8080/ff-codex/api/v1/games/1   # sucesso
+curl http://localhost:8080/ff-codex/api/v1/games/0   # id inválido
+curl http://localhost:8080/ff-codex/api/v1/games/999 # não encontrado
 ```
 
-Id inválido:
-
-```bash
-curl http://localhost:8080/ff-codex/games/0
-```
-
-Não encontrado:
-
-```bash
-curl http://localhost:8080/ff-codex/games/999
-```
-
-### DELETE /ff-codex/games/{id}
+### DELETE /ff-codex/api/v1/games/{id}
 
 Remove um jogo pelo `id` no banco.
 
@@ -461,22 +519,112 @@ Game com id 1 deletado com sucesso!
 
 **Erros:**
 
+- `400 Bad Request` — o jogo possui personagens vinculados. Como `characters.game_id` **não** tem `ON DELETE CASCADE`, a exclusão viola a FK (`SQLSTATE 23503`). Corpo: `{"error":"Referência inválida: o registro informado não existe","code":400}`.
 - `404 Not Found` — jogo não encontrado. Corpo: `{"error":"Game com id N não encontrado para deleção","code":404}`.
 - `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+
+**Exemplos com `curl`:**
+
+```bash
+curl -X DELETE http://localhost:8080/ff-codex/api/v1/games/999  # não encontrado
+```
+
+### POST /ff-codex/api/v1/games/{game_id}/characters
+
+Cadastra um personagem na tabela `characters`, vinculado ao jogo indicado no path. O vínculo **não** vai no body: `CharactersRequest` aceita apenas `name`.
+
+**Request Body:**
+
+```json
+{
+  "name": "Cloud Strife"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "name": "Cloud Strife"
+}
+```
+
+**Erros:**
+
+- `400 Bad Request` — `game_id <= 0` ou `name` vazio. A validação do `name` retorna o JSON estruturado:
+  ```json
+  {
+    "erro": "validacao_falhou",
+    "campos": [
+      { "campo": "name", "codigo": "name_vazio", "mensagem": "O nome do personogem do jogo não pode ser vazio" }
+    ]
+  }
+  ```
+- `400 Bad Request` — `game_id` inexistente (violação de FK, `SQLSTATE 23503`).
+- `409 Conflict` — o par `(game_id, name)` já existe (constraint `uk_character_game_name`, `SQLSTATE 23505`). Corpo: `{"error":"Já existe um registro com esses dados","code":409}`.
+- `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+
+> A mensagem de validação contém o typo `personogem`, presente no literal em `rest/dto/character.rs`.
 
 **Exemplos com `curl`:**
 
 Sucesso:
 
 ```bash
-curl -X DELETE http://localhost:8080/ff-codex/games/1
+curl -X POST http://localhost:8080/ff-codex/api/v1/games/1/characters \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Cloud Strife"}'
 ```
 
-Não encontrado:
+Nome duplicado no mesmo jogo:
 
 ```bash
-curl -X DELETE http://localhost:8080/ff-codex/games/999
+curl -X POST http://localhost:8080/ff-codex/api/v1/games/1/characters \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Cloud Strife"}'
 ```
+
+### GET /ff-codex/api/v1/games/{game_id}/characters
+
+Lista os personagens vinculados a um jogo, com o título e o ano do próprio jogo. Um `game_id` inexistente retorna `200 []`.
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Cloud Strife",
+    "title": "Final Fantasy VII",
+    "release_year": 1997
+  }
+]
+```
+
+**Erros:**
+
+- `400 Bad Request` — `game_id <= 0`. Corpo: `{"error":"O id do game não pode ser vazio ou menor que 1","code":400}`.
+- `500 Internal Server Error` — falha no banco. Corpo: `{"error":"Erro interno do servidor","code":500}`.
+
+**Exemplos com `curl`:**
+
+```bash
+curl http://localhost:8080/ff-codex/api/v1/games/1/characters
+```
+
+## Tratamento de erros
+
+Os handlers convertem `GameError` em `AppError` no limite HTTP. Pontos que valem registro:
+
+- `delete_game_by_id` trata `GameError::NotFound` explicitamente para devolver `404` com a mensagem de deleção.
+- Os demais caminhos passam pelo `From<sqlx::Error>`, que pode gerar `409`, `400` ou `500` conforme o SQLSTATE.
+- `CharacterError` convém com o mesmo shape (`NotFound` / `Internal`) usado por `GameError`.
+
+## Testes
+
+O projeto **não possui testes automatizados**. Não há `#[cfg(test)]`, `#[test]` nem diretório `app/tests/`. O job `test` do CI (`.github/workflows/rust.yml`) executa `cargo test --all-features` e, por não haver testes, conclui sem exercitar nada.
+
+O pipeline do CI roda três jobs em sequência: `check` (`cargo fmt --check` + `cargo clippy --all-targets --all-features` com `RUSTFLAGS: -Dwarnings`), `test` e `security` (`rustsec/audit-check@v2`). `SQLX_OFFLINE: true` é definido globalmente para que a compilação use o cache `.sqlx/`.
 
 ## Estrutura do projeto
 
@@ -485,58 +633,80 @@ ff-codex/
 ├── app/
 │   ├── Cargo.toml         # Manifesto do projeto (dependências e configuração)
 │   ├── Cargo.lock         # Versões travadas das dependências
-│   ├── Dockerfile         # Build multi-stage (rust:1.97 → distroless, porta 8080)
-│   ├── docker-compose.yml # PostgreSQL efêmero para desenvolvimento
-│   ├── .env               # Variáveis de ambiente (DATABASE_URL)
+│   ├── Dockerfile         # Build multi-stage (cargo-chef/rust 1.98 → distroless/cc, porta 8080, user nonroot)
+│   ├── docker-compose.yml # PostgreSQL efêmero + serviços migrate e prepare
+│   ├── .env               # DATABASE_URL
+│   ├── .sqlx/             # Cache de queries para compilação offline (12 arquivos)
 │   ├── migrations/        # Migrações SQLx
 │   │   ├── 001_create_table_game.sql
 │   │   ├── 002_insert_game.sql
-│   │   └── 003_create_table_caracters.sql
+│   │   ├── 003_create_table_characters.sql
+│   │   └── 004_insert_characters.sql
 │   └── src/
 │       ├── main.rs        # Ponto de entrada (dotenv + tracing JSON + pool SQLx + router + server)
-│       ├── rest.rs        # Módulo raiz da API (re-exports)
-│       ├── rest/
-│       │   ├── app_state.rs              # AppState (GameService) injetado via State
-│       │   ├── dto.rs                    # Módulo raiz dos DTOs
-│       │   ├── dto/game.rs               # DTOs (GamesRequest/Query/Response/DetailResponse) + validator + impl From<Game>
-│       │   ├── error.rs                  # AppError + IntoResponse centralizado (NotFound/BadRequest/Validation/Internal)
-│       │   ├── handler.rs                # Módulo raiz dos handlers
-│       │   ├── handler/health.rs         # GET /health e GET /ready
-│       │   ├── handler/games_handler.rs  # GET lista (com filtros) / GET por id / POST / DELETE
-│       │   ├── routers.rs                # Definição das rotas (+ with_state)
-│       │   └── server_app.rs             # Bind + graceful shutdown (Ctrl+C/SIGTERM)
+│       ├── util.rs        # Módulo raiz de utilitários
+│       ├── util/
+│       │   ├── banner.rs  # Impressão do banner no startup
+│       │   └── banner.txt # ASCII art "CODEx"
 │       ├── domain.rs      # Módulo raiz de domínio
-│       ├── domain/game.rs # Struct Game (FromRow, campos pub: id, titulo, ano_lancamento)
+│       ├── domain/
+│       │   ├── game.rs              # Game { id, title, release_year }
+│       │   ├── character.rs         # Character { id, name, game_id }
+│       │   └── characters_games.rs  # Projeção do JOIN personagens × games
 │       ├── repository.rs  # Módulo raiz de repositórios
-│       ├── repository/game.rs # GameRepository (PgPool + all_games + games_by_titulo + games_by_lancamento + games_by_titulo_and_lancamento + games_by_id + create_game + delete_game)
+│       ├── repository/
+│       │   ├── game.rs     # GameRepository (7 queries)
+│       │   └── character.rs # CharactersRepository (5 queries)
 │       ├── service.rs     # Módulo raiz de serviços
-│       └── service/game_service.rs # GameService (GameError + all_games + games_by_titulo + games_by_lancamento + games_by_titulo_and_lancamento + game_by_id + create_game + delete_game_by_id)
+│       ├── service/
+│       │   ├── game_service.rs       # GameService + GameError
+│       │   └── characters_service.rs # CharactersService + CharacterError
+│       ├── rest.rs        # Módulo raiz da API (re-exports)
+│       └── rest/
+│           ├── app_state.rs              # AppState (GameService + CharactersService)
+│           ├── error.rs                  # AppError + IntoResponse + mapeamento de SQLSTATE
+│           ├── server_app.rs             # Bind + graceful shutdown (Ctrl+C/SIGTERM)
+│           ├── routes.rs                 # Módulo raiz de rotas
+│           ├── routes/
+│           │   ├── router.rs             # /health + nest("/ff-codex/api/v1", ...) + with_state
+│           │   ├── games.rs              # Rotas de games
+│           │   └── characters.rs         # Rotas de characters
+│           ├── handler.rs                # Módulo raiz dos handlers
+│           ├── handler/
+│           │   ├── health.rs             # GET /health
+│           │   ├── games_handler.rs      # lista / por id / create / delete
+│           │   └── characters_handler.rs # lista / por id / create / list por game
+│           ├── dto.rs                    # Módulo raiz dos DTOs
+│           └── dto/
+│               ├── game.rs               # GamesRequest/Query/Response/GameDetailResponse
+│               └── character.rs          # CharactersRequest/Query/Response/DetailResponse/GamesDetailResponse
+├── .github/workflows/rust.yml # CI: fmt, clippy, test, rustsec
 ├── .gitignore             # Arquivos ignorados pelo Git
 ├── LICENSE                # Licença MIT
 └── README.md              # Este arquivo
 ```
 
-O código-fonte fica em `app/` — todos os comandos (`cargo`, `sqlx`, `docker compose`) devem ser executados a partir dessa pasta. A estrutura será expandida conforme novas dependências e módulos forem adicionados (ex.: camada Rust para a tabela `caracters`).
+O código-fonte fica em `app/` — todos os comandos (`cargo`, `sqlx`, `docker compose`) devem ser executados a partir dessa pasta.
 
 ## Schema do Banco
 
-O banco PostgreSQL contém duas tabelas com relacionamento 1:N. A tabela `caracters` possui uma grafia incorreta ("characters") que é mantida por consistência com o histórico de migrações.
+O banco PostgreSQL contém duas tabelas com relacionamento 1:N. A tabela se chama `characters` (grafia correta em inglês).
 
 ```mermaid
 erDiagram
     games {
         INTEGER id PK "GENERATED ALWAYS AS IDENTITY"
-        VARCHAR titulo "NOT NULL, max 255"
-        INTEGER ano_lancamento "NOT NULL"
+        VARCHAR title "NOT NULL, max 255"
+        INTEGER release_year "NOT NULL"
     }
 
-    caracters {
-        INTEGER id PK "GENERATED ALWAYS AS IDENTITY"
-        INTEGER game_id FK "REFERENCES games(id) ON DELETE CASCADE"
+    characters {
+        SERIAL id PK
+        INTEGER game_id FK "NOT NULL, REFERENCES games(id)"
         VARCHAR name "NOT NULL, max 255"
     }
 
-    games ||--o{ caracters : "possui"
+    games ||--o{ characters : "possui"
 ```
 
 **Detalhes das tabelas:**
@@ -544,11 +714,14 @@ erDiagram
 | Tabela | Coluna | Tipo | Constraints |
 |--------|--------|------|-------------|
 | `games` | `id` | `INTEGER` | PK, `GENERATED ALWAYS AS IDENTITY` |
-| `games` | `titulo` | `VARCHAR(255)` | `NOT NULL` |
-| `games` | `ano_lancamento` | `INTEGER` | `NOT NULL` |
-| `caracters` | `id` | `INTEGER` | PK, `GENERATED ALWAYS AS IDENTITY` |
-| `caracters` | `game_id` | `INTEGER` | FK → `games.id`, `ON DELETE CASCADE`, `NOT NULL` |
-| `caracters` | `name` | `VARCHAR(255)` | `NOT NULL` |
+| `games` | `title` | `VARCHAR(255)` | `NOT NULL` |
+| `games` | `release_year` | `INTEGER` | `NOT NULL` |
+| `characters` | `id` | `SERIAL` | PK |
+| `characters` | `game_id` | `INTEGER` | FK → `games.id`, `NOT NULL` |
+| `characters` | `name` | `VARCHAR(255)` | `NOT NULL` |
 
-**Relacionamento:** Um game pode ter vários caracters. Ao deletar um game, todos os caracters associados são removidos automaticamente (`ON DELETE CASCADE`).
+**Constraints adicionais:** `UNIQUE (game_id, name)` em `characters` — impede o mesmo nome de personagem duplicado dentro do mesmo jogo, e é a origem do `409 Conflict` no `POST`.
 
+**Relacionamento:** um game pode ter vários characters, e cada character pertence a exatamente um game. **Não há `ON DELETE CASCADE`**: ao deletar um game que possui personagens vinculados, a API responde `400 Bad Request` por violação de FK (`SQLSTATE 23503`).
+
+**Dados de seed:** a migração `002_insert_game.sql` popula 16 jogos (de *Final Fantasy* em 1987 até *Final Fantasy XVI* em 2023) e a migração `004_insert_characters.sql` popula cerca de 145 personagens vinculados a esses jogos.

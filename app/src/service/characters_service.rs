@@ -1,4 +1,5 @@
 use crate::domain::character::Character;
+use crate::domain::characters_games::CharactersGames;
 use crate::repository::character::CharactersRepository;
 use crate::service::game_service::GameError;
 use thiserror::Error;
@@ -50,6 +51,18 @@ impl CharactersService {
             .await
             .map_err(CharacterError::from)?;
         Ok(characters)
+    }
+
+    pub async fn all_characters_by_game_id(
+        &self,
+        game_id: i32,
+    ) -> Result<Vec<CharactersGames>, CharacterError> {
+        let characters_games = self
+            .db
+            .all_characters_by_id_game(game_id)
+            .await
+            .map_err(CharacterError::from)?;
+        Ok(characters_games)
     }
 
     pub async fn character_by_id(&self, id: i32) -> Result<Character, GameError> {

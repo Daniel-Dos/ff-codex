@@ -1,7 +1,8 @@
 use crate::rest::AppError;
 use crate::rest::app_state::AppState;
 use crate::rest::dto::character::{
-    CharactersDetailResponse, CharactersQuery, CharactersRequest, CharactersResponse,
+    CharactersDetailResponse, CharactersGamesDetailResponse, CharactersQuery, CharactersRequest,
+    CharactersResponse,
 };
 use crate::service::characters_service::CharacterError;
 use axum::Json;
@@ -71,6 +72,28 @@ pub async fn list_characters(
         Some(n) => characters_by_name(state, n).await,
         None => list_all(state).await,
     }
+}
+
+pub async fn characters_games(
+    State(state): State<AppState>,
+    Path(game_id): Path<i32>,
+) -> Result<Json<Vec<CharactersGamesDetailResponse>>, AppError> {
+    info!(
+        "Obtendo os personagems de um determinado game do id:  {} !",
+        game_id
+    );
+    let character_games = state
+        .characters_service
+        .all_characters_by_game_id(game_id)
+        .await
+        .map_err(map_service_error)?;
+
+    Ok(Json(
+        character_games
+            .into_iter()
+            .map(CharactersGamesDetailResponse::from)
+            .collect(),
+    ))
 }
 
 fn map_service_error(e: crate::service::characters_service::CharacterError) -> AppError {

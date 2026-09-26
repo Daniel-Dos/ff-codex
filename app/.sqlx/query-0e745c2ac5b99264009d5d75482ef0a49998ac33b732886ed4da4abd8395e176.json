@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select c.id AS character_id, c.name AS character_name, g.title AS title, g.release_year AS release_year from characters c  INNER JOIN games g on c.game_id = g.id where g.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "character_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "character_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "release_year",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0e745c2ac5b99264009d5d75482ef0a49998ac33b732886ed4da4abd8395e176"
+}
