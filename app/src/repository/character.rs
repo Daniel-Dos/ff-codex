@@ -1,4 +1,5 @@
 use crate::domain::character::Character;
+use crate::domain::characters_games::CharactersGames;
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -57,5 +58,15 @@ impl CharactersRepository {
             .await?;
 
         Ok(character)
+    }
+
+    pub async fn all_characters_by_id_game(
+        &self,
+        game_id: i32,
+    ) -> Result<Vec<CharactersGames>, sqlx::Error> {
+        let characters_games = sqlx::query_as!(CharactersGames,"select c.id AS character_id, c.name AS character_name, g.title AS title, g.release_year AS release_year from characters c  INNER JOIN games g on c.game_id = g.id where g.id = $1", game_id
+ ).fetch_all(&self.pool).await?;
+
+        Ok(characters_games)
     }
 }

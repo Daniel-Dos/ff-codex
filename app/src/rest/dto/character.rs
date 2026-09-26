@@ -1,4 +1,5 @@
 use crate::domain::character::Character;
+use crate::domain::characters_games::CharactersGames;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -27,6 +28,25 @@ pub struct CharactersDetailResponse {
     pub id: i32,
     pub name: String,
     pub game_id: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CharactersGamesDetailResponse {
+    pub id: i32,
+    pub name: String,
+    pub title: String,
+    pub release_year: i32,
+}
+
+impl From<CharactersGames> for CharactersGamesDetailResponse {
+    fn from(characters: CharactersGames) -> Self {
+        Self {
+            id: characters.character_id,
+            name: characters.character_name,
+            title: characters.title,
+            release_year: characters.release_year,
+        }
+    }
 }
 
 impl From<Character> for CharactersResponse {
