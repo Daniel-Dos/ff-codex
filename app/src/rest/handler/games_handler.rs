@@ -145,7 +145,7 @@ pub async fn delete_game(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<(StatusCode, String), AppError> {
-    warn!("Deletando o game com id: {}", id);
+    info!("Deletando o game com id: {}", id);
 
     state
         .game_service

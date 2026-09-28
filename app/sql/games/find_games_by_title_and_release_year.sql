@@ -1,0 +1,1 @@
+select * from games where title ilike '%' || $1 || '%' and release_year = $2

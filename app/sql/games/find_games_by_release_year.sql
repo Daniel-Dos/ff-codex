@@ -1,0 +1,1 @@
+select * from games where release_year = $1
