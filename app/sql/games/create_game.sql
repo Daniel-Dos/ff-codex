@@ -1,0 +1,1 @@
+insert into games (title, release_year) values ($1, $2) returning *

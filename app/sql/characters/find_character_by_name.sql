@@ -1,0 +1,1 @@
+select * from characters where name ilike '%' || $1 || '%'

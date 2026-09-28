@@ -5,7 +5,7 @@ use crate::service::game_service::GameError;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use tracing::{info, warn};
+use tracing::info;
 use validator::Validate;
 
 pub async fn game(
@@ -145,7 +145,7 @@ pub async fn delete_game(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<(StatusCode, String), AppError> {
-    warn!("Deletando o game com id: {}", id);
+    info!("Deletando o game com id: {}", id);
 
     state
         .game_service

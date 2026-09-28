@@ -12,7 +12,7 @@ impl GameRepository {
     }
 
     pub async fn all_games(&self) -> Result<Vec<Game>, sqlx::Error> {
-        let games = sqlx::query_as!(Game, "select * from games")
+        let games = sqlx::query_file_as!(Game, "sql/games/all_games.sql")
             .fetch_all(&self.pool)
             .await?;
 
@@ -20,21 +20,17 @@ impl GameRepository {
     }
 
     pub async fn games_by_title(&self, title: &str) -> Result<Vec<Game>, sqlx::Error> {
-        let games = sqlx::query_as!(
-            Game,
-            "select * from games where title ilike '%' || $1 || '%'",
-            title
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let games = sqlx::query_file_as!(Game, "sql/games/find_games_by_title.sql", title)
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(games)
     }
 
     pub async fn games_by_release_year(&self, release_year: i32) -> Result<Vec<Game>, sqlx::Error> {
-        let games = sqlx::query_as!(
+        let games = sqlx::query_file_as!(
             Game,
-            "select * from games where release_year = $1",
+            "sql/games/find_games_by_release_year.sql",
             release_year
         )
         .fetch_all(&self.pool)
@@ -47,9 +43,9 @@ impl GameRepository {
         title: &str,
         release_year: i32,
     ) -> Result<Vec<Game>, sqlx::Error> {
-        let games = sqlx::query_as!(
+        let games = sqlx::query_file_as!(
             Game,
-            "select * from games where title ilike '%' || $1 || '%' and release_year = $2",
+            "sql/games/find_games_by_title_and_release_year.sql",
             title,
             release_year
         )
@@ -59,20 +55,15 @@ impl GameRepository {
     }
 
     pub async fn create_game(&self, title: &str, release_year: i32) -> Result<Game, sqlx::Error> {
-        let game = sqlx::query_as!(
-            Game,
-            "insert into games (title, release_year) values ($1, $2) returning *",
-            title,
-            release_year,
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let game = sqlx::query_file_as!(Game, "sql/games/create_game.sql", title, release_year,)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(game)
     }
 
     pub async fn delete_game(&self, id: i32) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!("delete from games where id = $1", id)
+        let result = sqlx::query_file!("sql/games/delete_game.sql", id)
             .execute(&self.pool)
             .await?;
 
@@ -80,7 +71,7 @@ impl GameRepository {
     }
 
     pub async fn games_by_id(&self, id: i32) -> Result<Game, sqlx::Error> {
-        let game = sqlx::query_as!(Game, "select * from games where id = $1", id)
+        let game = sqlx::query_file_as!(Game, "sql/games/find_games_by_id.sql", id)
             .fetch_one(&self.pool)
             .await?;
 
