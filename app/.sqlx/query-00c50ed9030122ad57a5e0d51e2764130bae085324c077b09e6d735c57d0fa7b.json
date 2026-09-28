@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select c.id AS character_id, c.name AS character_name, g.title AS title, g.release_year AS release_year from characters c  INNER JOIN games g on c.game_id = g.id where g.id = $1",
+  "query": "select c.id AS character_id, c.name AS character_name, g.title AS title, g.release_year AS release_year\nfrom characters c\n         INNER JOIN games g on c.game_id = g.id\nwhere g.id = $1",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "0e745c2ac5b99264009d5d75482ef0a49998ac33b732886ed4da4abd8395e176"
+  "hash": "00c50ed9030122ad57a5e0d51e2764130bae085324c077b09e6d735c57d0fa7b"
 }

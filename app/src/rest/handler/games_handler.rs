@@ -5,7 +5,7 @@ use crate::service::game_service::GameError;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use tracing::{info, warn};
+use tracing::info;
 use validator::Validate;
 
 pub async fn game(
